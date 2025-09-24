@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>5-Card Draw Multiplayer</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:#06121a;color:#e6eef6}
+    .container{max-width:960px;margin:24px auto;padding:16px}
+    h2{font-weight:800;color:#f59e0b}
+    .small{font-size:13px;color:#9ca3af}
+    .input,select{
+      padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:#e6eef6;width:100%;
+    }
+    .btn{
+      background:#f59e0b;color:#04121a;border:none;padding:8px 12px;
+      border-radius:6px;font-weight:800;cursor:pointer;
+    }
+    .btn.ghost{
+      background:transparent;border:1px solid rgba(255,255,255,0.06);
+      color:#e6eef6;
+    }
+    #players{
+      display:flex;flex-wrap:wrap;gap:12px;justify-content:center;
+      margin-top:16px;
+    }
+    .player{
+      background:#0f1720;padding:8px;border-radius:6px;
+      min-width:140px;border:1px solid rgba(255,255,255,0.03);
+    }
+    .you{box-shadow:0 0 0 3px rgba(34,197,94,0.5)}
+    .cards{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+    .card-face{
+      width:40px;height:60px;border-radius:4px;background:#fff;color:#000;
+      display:flex;align-items:center;justify-content:center;font-weight:700;
+      font-size:14px;cursor:default;
+    }
+    .selected{outline:2px solid #f59e0b}
+    .controls{
+      display:flex;gap:8px;align-items:center;justify-content:center;
+      margin-top:16px;flex-wrap:wrap;
+    }
+    .log{
+      max-height:150px;overflow:auto;background:rgba(255,255,255,0.02);
+      padding:8px;border-radius:6px;margin-top:12px;font-size:13px;
+    }
+    .status{
+      margin-top:8px;text-align:center;color:#9ca3af;
+    }
+    @media(max-width:700px){
+      #players{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>5-Card Draw Multiplayer</h2>
+
+    <!-- Start screen -->
+    <div id="start">
+      <label class="small">Your Name</label>
+      <input id="nick" class="input" type="text"/>
+
+      <label class="small" style="margin-top:8px">Seats</label>
+      <select id="seats" class="input"><option>4</option><option>6</option><option>9</option></select>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="btnCreate" class="btn">Create Room</button>
+        <button id="btnJoin" class="btn ghost">Join Room</button>
+      </div>
+
+      <label class="small" style="margin-top:8px">Room ID</label>
+      <input id="roomId" class="input" type="text" placeholder="ABC123"/>
+
+      <div id="msg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Game UI -->
+    <div id="game" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="small">Room: <span id="roomLabel"></span></div>
+        <div style="margin-left:auto">
+          <button id="btnLeave" class="btn ghost">Leave</button>
+        </div>
+      </div>
+
+      <div id="players"></div>
+      <div id="drawArea" style="text-align:center;margin-top:12px"></div>
+
+      <div class="controls" id="controls">
+        <button id="btnCheck" class="btn">Check</button>
+        <button id="btnCall" class="btn">Call</button>
+        <button id="btnRaise" class="btn">Raise</button>
+        <input id="raiseAmt" class="input" type="number" placeholder="Amt" style="width:80px"/>
+        <button id="btnFold" class="btn ghost">Fold</button>
+        <button id="btnDeal" class="btn ghost">Deal</button>
+        <button id="btnDraw" class="btn ghost">Draw</button>
+      </div>
+
+      <div id="status" class="status">Connecting…</div>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const el = id => document.getElementById(id);
+    const logMsg = t => el('log').innerHTML = `<div>${t}</div>` + el('log').innerHTML;
+
+    // Utilities
+    function showStart(){
+      el('start').style.display = 'block';
+      el('game').style.display  = 'none';
+    }
+    function showGame(r){
+      el('start').style.display = 'none';
+      el('game').style.display  = 'block';
+      el('roomLabel').textContent = r;
+    }
+    function parseParams(){
+      return new URLSearchParams(window.location.search);
+    }
+
+    // Guess a name: from URL, or localStorage, or file path (Windows user)
+    function guessName(){
+      const params = parseParams();
+      if(params.get('nick')) return params.get('nick');
+      const stored = localStorage.getItem('username');
+      if(stored) return stored;
+      if(location.protocol==='file:'){
+        const parts = decodeURIComponent(location.pathname).split('/');
+        const idx   = parts.indexOf('Users');
+        if(idx>=0 && parts[idx+1]) return parts[idx+1];
+      }
+      return 'You';
+    }
+
+    // On load: prefill name, maybe auto-join
+    (()=>{
+      const name = guessName();
+      el('nick').value = name;
+      // Save on change
+      el('nick').onblur = ()=>localStorage.setItem('username', el('nick').value.trim());
+      // Auto-join if ?room=XYZ
+      const params = parseParams();
+      const room   = params.get('room');
+      if(room){
+        el('roomId').value = room;
+        setTimeout(()=>el('btnJoin').click(), 200);
+      }
+    })();
+
+    // Create room → redirect to ?room=ID
+    el('btnCreate').onclick = ()=>{
+      socket.emit('createRoom',{ seats:+el('seats').value }, resp=>{
+        if(resp.roomId){
+          window.location.search = '?room=' + resp.roomId;
+        }
+      });
+    };
+
+    // Join room
+    el('btnJoin').onclick = ()=> {
+      const rid = el('roomId').value.trim().toUpperCase();
+      const name= el('nick').value.trim() || 'You';
+      socket.emit('joinRoom',{ roomId:rid, name }, resp=>{
+        if(!resp.ok){
+          el('msg').textContent = resp.err;
+          return;
+        }
+        showGame(rid);
+      });
+    };
+
+    el('btnLeave').onclick = ()=> {
+      showStart();
+      history.replaceState(null,'','five-card-draw.html');
+    };
+
+    // Game actions
+    el('btnDeal').onclick  = ()=> socket.emit('startHand');
+    el('btnCheck').onclick = ()=> socket.emit('action',{type:'check'});
+    el('btnCall').onclick  = ()=> socket.emit('action',{type:'call'});
+    el('btnRaise').onclick = ()=> socket.emit('action',{type:'raise',amount:+el('raiseAmt').value});
+    el('btnFold').onclick  = ()=> socket.emit('action',{type:'fold'});
+    el('btnDraw').onclick  = ()=>{
+      const idxs = [...document.querySelectorAll('.you .card-face.selected')]
+        .map(x=>+x.dataset.idx);
+      socket.emit('draw',{indices:idxs});
+    };
+
+    // Receive updates
+    socket.on('state', s=>{
+      logMsg(`Phase=${s.phase} Pot=$${s.pot} ToCall=$${s.currentBet}`);
+      el('status').textContent = `Phase: ${s.phase}`;
+
+      // render players
+      const box = el('players');
+      box.innerHTML = '';
+      s.players.forEach((p,i)=>{
+        const d = document.createElement('div');
+        d.className = 'player' + (i===0?' you':'');
+        d.innerHTML = `
+          <div style="font-weight:700">${p.name}</div>
+          <div class="small">Bal: $${p.balance}</div>
+          <div class="cards"></div>
+          <div class="small">Bet: $${p.bet}${p.folded?' (folded)':''}</div>
+        `;
+        box.appendChild(d);
+      });
+
+      // draw phase: fetch your real cards
+      if(s.phase==='draw'){
+        el('btnDraw').style.display='inline-block';
+        socket.emit('playerCards', cards=>{
+          const your = document.querySelector('.you .cards');
+          your.innerHTML = '';
+          cards.forEach((c,i)=>{
+            const cd = document.createElement('div');
+            cd.className = 'card-face';
+            cd.dataset.idx = i;
+            cd.textContent = c.r + c.s;
+            cd.onclick = ()=> cd.classList.toggle('selected');
+            your.appendChild(cd);
+          });
+        });
+      } else {
+        el('btnDraw').style.display='none';
+        // show backs for others
+        document.querySelectorAll('.player').forEach((div,i)=>{
+          if(i!==0){
+            const cc = div.querySelector('.cards');
+            cc.innerHTML = s.players[i].cardsCount>0
+              ? Array(s.players[i].cardsCount).fill('<div class="card-face">🂠</div>').join('')
+              : '';
+          }
+        });
+      }
+
+      // show Deal when idle
+      el('btnDeal').style.display = s.phase==='idle'?'inline-block':'none';
+
+      // enable on your turn
+      ['btnCheck','btnCall','btnRaise','btnFold','raiseAmt'].forEach(id=>{
+        el(id).disabled = !(s.turn===0 && (s.phase==='bet1'||s.phase==='bet2'));
+      });
+    });
+
+    socket.on('connect',    ()=>el('status').textContent='Connected');
+    socket.on('disconnect', ()=>el('status').textContent='Disconnected');
+  </script>
+</body>
+</html>

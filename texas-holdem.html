@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Texas Hold'em — Local Table (Retry)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{--bg:#06121a;--panel:#0f1720;--accent:#f59e0b;--muted:#9ca3af}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(180deg,#04111a,#071827);color:#e6eef6}
+.container{max-width:1100px;margin:24px auto;padding:16px}
+.header{display:flex;align-items:center;gap:12px}
+.h-title{font-weight:800;color:var(--accent);font-size:20px}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:16px;margin-top:16px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:10px}
+.form label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+.input,select{width:100%;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;box-sizing:border-box}
+.btn{background:var(--accent);color:#04121a;border:none;padding:10px 12px;border-radius:8px;font-weight:800;cursor:pointer}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit}
+.preview{background:#071827;padding:10px;border-radius:8px;min-height:220px}
+.player-mini{background:var(--panel);padding:8px;border-radius:8px;margin-bottom:8px}
+.small{font-size:13px;color:var(--muted)}
+.app{display:none;margin-top:16px}
+.topbar{display:flex;align-items:center;gap:12px}
+.table{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.player{background:var(--panel);padding:10px;border-radius:8px;min-width:170px;border:1px solid rgba(255,255,255,0.03)}
+.you{box-shadow:0 0 0 3px rgba(34,197,94,0.06)}
+.cards{font-size:18px;letter-spacing:6px}
+.board{display:flex;gap:8px;justify-content:center;margin-top:12px;min-height:80px}
+.card-face{width:56px;height:80px;border-radius:6px;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;font-weight:700}
+.bottom-controls{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.secondary{background:#1f2937;color:#e6eef6}
+.log{max-height:160px;overflow:auto;background:#071827;padding:8px;border-radius:6px;margin-top:12px;font-size:13px}
+.status{margin-top:8px;text-align:center;color:#cfe9ff}
+@media(max-width:880px){ .grid{grid-template-columns:1fr} .header{flex-direction:column;align-items:flex-start} }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="h-title">Texas Hold'em — Local Table (Retry)</div>
+    <div class="small">Local play vs bots. Back goes to index.html</div>
+  </div>
+
+  <div class="grid">
+    <div class="card form">
+      <div>
+        <label>Nickname</label>
+        <input id="nick" class="input" type="text" value="You" maxlength="20">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <label>Buy-in</label>
+          <input id="buyin" class="input" type="number" min="10" step="10" value="1000">
+        </div>
+        <div style="width:120px">
+          <label>Seats</label>
+          <select id="seats" class="input">
+            <option value="4" selected>4</option>
+            <option value="6">6</option>
+            <option value="9">9</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:8px">
+        <label><input id="useBots" type="checkbox" checked> Fill seats with bots</label>
+      </div>
+
+      <div style="margin-top:8px">
+        <label><input id="enableChain" type="checkbox" checked> Enable check-chain (one-card reveals)</label>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+        <button id="btnStart" class="btn">Start Local Table</button>
+        <button id="btnDemo" class="btn ghost">Quick Demo</button>
+      </div>
+
+      <div class="small" style="margin-top:12px">
+        Chain rule: when a check originates with no bet, sequential confirmations rotate clockwise; when it comes back to origin and origin still stands, reveal exactly one community card and open 4–7s reaction window; a raise during the window cancels auto-progression.
+      </div>
+    </div>
+
+    <div class="card preview">
+      <div class="small">Preview seats</div>
+      <div id="previewSeats"></div>
+      <div style="margin-top:10px" class="small">Start a table and the full game UI appears on the right.</div>
+    </div>
+  </div>
+
+  <div class="app card" id="app">
+    <div class="topbar">
+      <div class="small">Session: local-demo</div>
+      <div style="margin-left:auto" class="small">Player: <span id="playerName">You</span></div>
+      <div><button id="btnBack" class="btn ghost">Back</button></div>
+    </div>
+
+    <div class="table" id="table"></div>
+
+    <div class="board" id="board"></div>
+
+    <div class="bottom-controls">
+      <div style="text-align:center">
+        <div>Pot: <strong id="pot">0</strong></div>
+        <div class="small">To call: <span id="toCall">0</span></div>
+        <div id="checkCounter" class="small" style="margin-top:6px"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnCheck" class="btn">Check</button>
+        <button id="btnCall" class="btn">Call</button>
+        <button id="btnRaise" class="btn">Raise</button>
+        <input id="raiseAmount" class="input" type="number" min="1" placeholder="Raise amt" style="width:110px">
+        <button id="btnFold" class="btn secondary">Fold</button>
+        <button id="btnDeal" class="btn secondary">New Hand</button>
+      </div>
+    </div>
+
+    <div id="reactionArea" class="status"></div>
+    <div id="status" class="status">Waiting.</div>
+    <div id="log" class="log"></div>
+  </div>
+</div>
+
+<script>
+/* Texas Hold'em — retry single-file
+   - Save as texas-holdem.html
+   - Back button navigates to index.html
+   - Single human (seat 0) vs bots. Chain rule optional.
+*/
+
+/* Utilities */
+const rand = n => Math.floor(Math.random()*n);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const el = id => document.getElementById(id);
+const log = t => { el('log').innerHTML = `<div>${t}</div>` + el('log').innerHTML; };
+
+/* Preview seats rendering */
+function renderPreviewSeats(count=4){
+  const box = el('previewSeats'); box.innerHTML = '';
+  const names = ['Marco Calm','Vega Ace','Rosie Flash','Trent','Lina','Gus','Nadia','Royce','Margo'];
+  for (let i=0;i<count;i++){
+    const d = document.createElement('div'); d.className = 'player-mini';
+    d.innerHTML = `<div style="font-weight:700">${names[i]||'Seat '+(i+1)}</div><div class="small">Balance: $1000</div><div class="small">Status: Waiting</div>`;
+    box.appendChild(d);
+  }
+}
+renderPreviewSeats(4);
+
+/* State */
+const STORAGE_KEY = 'texas_holdem_retry_balances';
+const REACTION_MIN = 4000, REACTION_MAX = 7000;
+let MAX_PLAYERS = 4;
+let deck = [], players = [], community = [], pot = 0, currentBet = 0;
+let dealerIndex = 0, turnIndex = 0;
+let roundStage = 'idle', bettingActive = false;
+
+/* Chain state */
+let checksThisRound = new Set();
+let chainActive = false;
+let chainOrigin = null;
+let chainPending = [];
+let flopRevealedCount = 0;
+let reactionTimer = null;
+let reactionEndsAt = 0;
+
+/* Human action promise */
+let humanResolve = null;
+
+/* Persistence functions */
+function loadBalances(defaultAmt=1000){
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw){ const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; } } catch(e){}
+  return Array.from({length:MAX_PLAYERS},_=>defaultAmt);
+}
+function saveBalances(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(players.map(p=>p.balance))); }catch(e){} }
+
+/* Deck helpers */
+function makeDeck(){
+  const suits=['♠','♥','♦','♣'], ranks=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  deck=[]; for (let s of suits) for (let r of ranks) deck.push({r,s});
+  for (let i=deck.length-1;i>0;i--){ const j=rand(i+1); [deck[i],deck[j]] = [deck[j],deck[i]]; }
+}
+function dealCard(){ return deck.pop(); }
+
+/* Initialize players */
+function initPlayers(nick,seats,buyin,useBots){
+  MAX_PLAYERS = seats;
+  const balances = loadBalances(buyin);
+  players = [];
+  const botProfiles = [{suffix:'Calm',baseAggro:0.35,risk:0.28},{suffix:'Ace',baseAggro:0.55,risk:0.50},{suffix:'Flash',baseAggro:0.70,risk:0.68}];
+  const botNames = ['Marco','Vega','Rosie','Trent','Lina','Gus','Nadia','Royce','Margo'];
+  for (let i=0;i<MAX_PLAYERS;i++){
+    if (i===0) players.push({id:0,name:nick,balance:balances[0] ?? buyin,bet:0,folded:false,allIn:false,cards:[],isBot:false,profile:null,aggression:0});
+    else {
+      if (!useBots) players.push({id:i,name:`Seat ${i+1}`,balance:balances[i] ?? buyin,bet:0,folded:true,allIn:false,cards:[],isBot:false,profile:null,aggression:0});
+      else { const p=botProfiles[(i-1)%botProfiles.length]; const n=botNames[(i-1)%botNames.length]; players.push({id:i,name:`${n} ${p.suffix}`,balance:balances[i] ?? buyin,bet:0,folded:false,allIn:false,cards:[],isBot:true,profile:{...p},aggression:0}); }
+    }
+  }
+  dealerIndex = 0;
+  renderTable();
+}
+
+/* Render UI */
+function renderTable(){
+  const table = el('table'); table.innerHTML = '';
+  players.forEach((p,i)=>{
+    const div = document.createElement('div'); div.className = 'player' + (i===0 ? ' you' : '');
+    const cardText = (i===0) ? p.cards.map(c=>c.r + c.s).join(' ') : (p.isBot ? (p.folded ? 'Folded' : (p.cards.length ? '🂠 🂠' : '—')) : p.cards.map(c=>c.r + c.s).join(' '));
+    div.innerHTML = `<div style="font-weight:700">${p.name}${p.isBot?'<span class="small"> (bot)</span>':''}</div><div class="cards">${cardText}</div><div class="small">Balance: $${p.balance}${p.allIn? ' (all-in)':''}</div><div class="small">Bet: $${p.bet}${p.folded? ' (folded)':''}</div>`;
+    table.appendChild(div);
+  });
+  el('board').innerHTML = community.map(c=>`<div class="card-face">${c.r + c.s}</div>`).join('');
+  el('pot').textContent = pot;
+  el('toCall').textContent = currentBet;
+  el('playerName').textContent = players[0]?.name || '';
+  el('checkCounter').textContent = chainActive ? `Chain origin: ${players[chainOrigin].name} — Next: ${players[chainPending[0]]? players[chainPending[0]].name : 'origin'}` : '';
+}
+
+/* Chain helpers */
+function buildChain(origin){
+  const order=[];
+  for (let i=1;i<MAX_PLAYERS;i++){
+    const idx=(origin+i)%MAX_PLAYERS;
+    const p = players[idx];
+    if (!p.folded && !p.allIn) order.push(idx);
+  }
+  return order;
+}
+function startChain(origin){
+  if (!window.CHAIN_RULE_ENABLED) return;
+  chainActive = true;
+  chainOrigin = origin;
+  chainPending = buildChain(origin);
+  checksThisRound.add(origin);
+  renderTable();
+  log(`${players[origin].name} started check-chain.`);
+}
+
+/* Chain completion: reveal one card then reaction window */
+function completeChainAndReact(){
+  chainActive = false;
+  if (roundStage === 'preflop'){
+    community.push(dealCard());
+    flopRevealedCount = Math.min(3, flopRevealedCount + 1);
+    log(`One flop card revealed (${flopRevealedCount}/3).`);
+    if (flopRevealedCount === 3) roundStage = 'flop';
+  } else if (roundStage === 'flop'){
+    community.push(dealCard()); roundStage = 'turn'; log('Turn revealed.');
+  } else if (roundStage === 'turn'){
+    community.push(dealCard()); roundStage = 'river'; log('River revealed.');
+  } else {
+    log('Chain reached end stage.');
+  }
+  renderTable();
+
+  const ms = REACTION_MIN + Math.floor(Math.random()*(REACTION_MAX - REACTION_MIN + 1));
+  reactionEndsAt = Date.now() + ms;
+  el('reactionArea').textContent = `Reaction window: ${Math.ceil(ms/1000)}s — fold or raise now`;
+  reactionTimer = setTimeout(()=>{
+    el('reactionArea').textContent = '';
+    log('Reaction ended; proceeding to betting.');
+    turnIndex = (dealerIndex + 1) % MAX_PLAYERS;
+    checksThisRound.clear();
+    proceedToNextBettingAfterReveal();
+  }, ms);
+
+  const cd = setInterval(()=>{
+    const left = Math.max(0, reactionEndsAt - Date.now());
+    el('reactionArea').textContent = `Reaction window: ${Math.ceil(left/1000)}s — fold or raise now`;
+    if (left <= 0) clearInterval(cd);
+  }, 200);
+}
+function cancelReactionDueToRaise(){
+  if (reactionTimer){ clearTimeout(reactionTimer); reactionTimer = null; el('reactionArea').textContent = ''; log('Raise during reaction window — cancelled auto progression.'); proceedToNextBettingAfterReveal(); }
+}
+async function proceedToNextBettingAfterReveal(){ await sleep(150); await bettingRound(); }
+
+/* Betting helpers */
+function resetBets(){ players.forEach(p=>p.bet=0); currentBet = 0; pot = 0; }
+function collectBetsToPot(){ players.forEach(p=>{ pot += p.bet; p.bet = 0; }); }
+
+/* New hand */
+async function newHand(){
+  roundStage = 'preflop';
+  flopRevealedCount = 0;
+  bettingActive = false;
+  makeDeck();
+  community = [];
+  resetBets();
+  players.forEach(p=>{ p.folded=false; p.allIn=false; p.cards=[]; p.bet=0; p.aggression = p.aggression || 0; });
+  for (let i=0;i<2;i++) for (let j=0;j<MAX_PLAYERS;j++) players[j].cards.push(dealCard());
+  turnIndex = (dealerIndex + 1) % MAX_PLAYERS;
+  currentBet = 0;
+  pot = 0;
+  checksThisRound.clear();
+  chainActive = false;
+  chainOrigin = null;
+  chainPending = [];
+  renderTable();
+  log('New hand dealt. Pre-flop betting begins.');
+  await bettingRound();
+}
+
+/* Who's active */
+function anyActiveExceptOne(){ return players.filter(p=>!p.folded && !p.allIn).length <= 1; }
+
+/* Betting round */
+async function bettingRound(){
+  bettingActive = true;
+  checksThisRound.clear();
+  if (anyActiveExceptOne()){ bettingActive = false; await proceedToNextStage(); return; }
+
+  let needToAct = new Set(players.filter(p=>!p.folded && !p.allIn).map(p=>p.id));
+  if (currentBet > 0) needToAct = new Set(players.filter(p=>!p.folded && !p.allIn && p.bet !== currentBet).map(p=>p.id));
+
+  while (needToAct.size > 0){
+    if (players[turnIndex].folded || players[turnIndex].allIn){ turnIndex = (turnIndex+1) % MAX_PLAYERS; continue; }
+    const p = players[turnIndex];
+    renderTable();
+    updateControlsForPlayer(p);
+
+    if (chainActive){
+      if (chainPending.length === 0){ completeChainAndReact(); break; }
+      const nextActor = chainPending[0];
+      if (p.id !== nextActor){ turnIndex = (turnIndex+1) % MAX_PLAYERS; continue; }
+      let action;
+      if (p.isBot) action = await botAct(p, {chainMode:true});
+      else action = await humanActionPromise();
+      if (action && action.type === 'check'){ chainPending.shift(); log(`${p.name} confirmed check.`); if (chainPending.length === 0){ completeChainAndReact(); break; } turnIndex = (turnIndex+1) % MAX_PLAYERS; continue; }
+      if (action && action.type === 'fold'){ chainPending.shift(); p.folded = true; log(`${p.name} folded during chain.`); if (anyActiveExceptOne()){ bettingActive = false; break; } turnIndex = (turnIndex+1) % MAX_PLAYERS; continue; }
+      if (action && (action.type === 'raise' || action.type === 'call')){ chainActive = false; checksThisRound.clear(); cancelReactionDueToRaise(); }
+    } else {
+      let action;
+      if (p.isBot) action = await botAct(p, {chainMode:false});
+      else action = await humanActionPromise();
+
+      if (action && action.type === 'raise'){ checksThisRound.clear(); }
+      if (action && action.type === 'check' && currentBet === 0 && !chainActive && window.CHAIN_RULE_ENABLED){
+        startChain(p.id);
+        if (chainPending.length === 0){ completeChainAndReact(); break; }
+        turnIndex = chainPending[0];
+        needToAct = new Set(players.filter(x=>!x.folded && !x.allIn && x.bet !== currentBet).map(x=>x.id));
+        continue;
+      }
+    }
+
+    needToAct = new Set(players.filter(x=>!x.folded && !x.allIn && x.bet !== currentBet).map(x=>x.id));
+    turnIndex = (turnIndex+1) % MAX_PLAYERS;
+    if (anyActiveExceptOne()){ bettingActive = false; break; }
+  }
+
+  collectBetsToPot();
+  saveBalances();
+  bettingActive = false;
+  renderTable();
+  log(`Betting round complete. Pot is $${pot}.`);
+  await sleep(300);
+  await proceedToNextStage();
+}
+
+/* Stage progression */
+async function proceedToNextStage(){
+  if (roundStage === 'preflop'){
+    if (flopRevealedCount === 0){ community.push(dealCard(), dealCard(), dealCard()); flopRevealedCount = 3; }
+    else if (flopRevealedCount < 3){ while (flopRevealedCount < 3){ community.push(dealCard()); flopRevealedCount++; } }
+    roundStage = 'flop'; log('Flop revealed.');
+  } else if (roundStage === 'flop'){ community.push(dealCard()); roundStage = 'turn'; log('Turn revealed.'); }
+  else if (roundStage === 'turn'){ community.push(dealCard()); roundStage = 'river'; log('River revealed.'); }
+  else if (roundStage === 'river'){ roundStage = 'showdown'; log('Showdown.'); await showdown(); return; }
+  turnIndex = (dealerIndex + 1) % MAX_PLAYERS;
+  currentBet = 0;
+  players.forEach(p=>p.bet = 0);
+  checksThisRound.clear();
+  renderTable();
+  await sleep(300);
+  await bettingRound();
+}
+
+/* Human action promise and controls */
+function humanActionPromise(){ return new Promise(resolve => { humanResolve = resolve; }); }
+function updateControlsForPlayer(player){
+  const humanTurn = !player.isBot && bettingActive && !player.folded && !player.allIn;
+  const isChainTurn = chainActive && chainPending.length>0 && chainPending[0] === player.id;
+  const controlsActive = humanTurn && (!chainActive || isChainTurn);
+  el('btnCheck').disabled = !controlsActive;
+  el('btnCall').disabled = !controlsActive;
+  el('btnRaise').disabled = !controlsActive;
+  el('btnFold').disabled = !controlsActive;
+  el('raiseAmount').disabled = !controlsActive;
+  if (!controlsActive) el('status').textContent = player.isBot ? `Waiting for ${player.name}...` : 'Waiting for other players...';
+  else el('status').textContent = chainActive ? 'Your chain turn — Check, Fold, or Raise' : 'Your turn — Check, Call, Raise, or Fold';
+}
+
+/* Human buttons */
+el('btnCheck').addEventListener('click', ()=>{
+  const p = players[0];
+  if (currentBet === 0){
+    checksThisRound.add(p.id);
+    log('You checked.');
+    if (chainActive && chainPending[0] === p.id){ if (humanResolve) humanResolve({type:'check'}); humanResolve = null; return; }
+    if (!chainActive){ if (humanResolve) humanResolve({type:'check'}); humanResolve = null; return; }
+  } else {
+    const need = currentBet - p.bet;
+    if (need <= 0){ if (humanResolve) humanResolve({type:'check'}); humanResolve = null; return; }
+    if (need >= p.balance){ p.bet += p.balance; p.allIn = true; p.balance = 0; log(`You called all-in $${p.bet}.`); }
+    else { p.balance -= need; p.bet += need; log(`You called $${need}.`); }
+    if (humanResolve) humanResolve({type:'call'}); humanResolve = null;
+  }
+  renderTable();
+});
+el('btnCall').addEventListener('click', ()=>{
+  const p = players[0];
+  const need = currentBet - p.bet;
+  if (need <= 0){ if (humanResolve) humanResolve({type:'check'}); humanResolve = null; return; }
+  if (need >= p.balance){ p.bet += p.balance; p.allIn = true; p.balance = 0; log(`You called all-in $${p.bet}.`); }
+  else { p.balance -= need; p.bet += need; log(`You called $${need}.`); }
+  renderTable();
+  if (humanResolve) humanResolve({type:'call'}); humanResolve = null;
+});
+el('btnRaise').addEventListener('click', ()=>{
+  const p = players[0];
+  const raise = Number(el('raiseAmount').value) || 0;
+  if (!raise || raise <= 0){ alert('Enter raise amount'); return; }
+  const toPut = (currentBet - p.bet) + raise;
+  if (toPut >= p.balance){
+    p.bet += p.balance; p.allIn = true; p.balance = 0; currentBet = Math.max(currentBet, p.bet);
+    log(`You pushed all-in $${p.bet}.`);
+    checksThisRound.clear(); if (humanResolve) humanResolve({type:'raise'}); humanResolve = null;
+  } else {
+    p.balance -= toPut; p.bet += toPut; currentBet = p.bet;
+    log(`You raised by $${raise} (total this round: $${p.bet}).`);
+    checksThisRound.clear(); if (humanResolve) humanResolve({type:'raise'}); humanResolve = null;
+  }
+  renderTable();
+  cancelReactionDueToRaise();
+});
+el('btnFold').addEventListener('click', ()=>{
+  const p = players[0];
+  p.folded = true;
+  log('You folded.');
+  renderTable();
+  if (humanResolve) humanResolve({type:'fold'}); humanResolve = null;
+});
+
+/* Bot AI */
+async function botAct(bot, opts={chainMode:false}){
+  await sleep(800 + Math.random()*1600);
+  if (opts.chainMode && chainPending.length>0 && chainPending[0] !== bot.id) return {type:'noop'};
+  const toCall = Math.max(0, currentBet - bot.bet);
+  const potOdds = toCall > 0 ? (toCall / (pot + toCall)) : 0;
+  const baseline = Math.random();
+  const riskiness = bot.profile?.risk || 0.4;
+  const raiseBias = 0.75 + baseline*0.12 + riskiness*0.08;
+  const foldBias = 0.25 - baseline*0.1 + potOdds;
+  if (toCall > 0){
+    const r = Math.random();
+    if (r > raiseBias && bot.balance > toCall + 5){
+      const raiseBy = Math.max(5, Math.floor((bot.balance/12) * (0.5 + Math.random())));
+      const put = Math.min(bot.balance, toCall + raiseBy);
+      bot.bet += put; bot.balance -= put; if (bot.balance === 0) bot.allIn = true;
+      currentBet = bot.bet; log(`${bot.name} raised to $${bot.bet}.`); renderTable(); return {type:'raise'};
+    } else if (r < foldBias){
+      bot.folded = true; log(`${bot.name} folded.`); renderTable(); return {type:'fold'};
+    } else {
+      const callAmt = Math.min(bot.balance, toCall);
+      bot.bet += callAmt; bot.balance -= callAmt; if (bot.balance === 0) bot.allIn = true;
+      log(`${bot.name} called $${callAmt}.`); renderTable(); return {type:'call'};
+    }
+  } else {
+    const r = Math.random();
+    if (r > raiseBias && bot.balance > 5){
+      const betAmt = Math.max(5, Math.floor((bot.balance/18) + Math.random()*12));
+      bot.bet += betAmt; bot.balance -= betAmt; currentBet = bot.bet; log(`${bot.name} bets $${betAmt}.`); renderTable(); return {type:'raise'};
+    } else {
+      if (!chainActive && currentBet === 0){ checksThisRound.add(bot.id); log(`${bot.name} checks.`); renderTable(); return {type:'check'}; }
+      if (chainActive && chainPending.length>0 && chainPending[0] === bot.id){
+        const r2 = Math.random();
+        if (r2 > raiseBias && bot.balance > 5){
+          const betAmt = Math.max(5, Math.floor((bot.balance/18) + Math.random()*12));
+          bot.bet += betAmt; bot.balance -= betAmt; currentBet = bot.bet; chainActive = false; checksThisRound.clear(); log(`${bot.name} raises $${betAmt} in chain, cancelling chain.`); renderTable(); return {type:'raise'};
+        } else if (r2 < foldBias){
+          bot.folded = true; log(`${bot.name} folded in chain.`); renderTable(); return {type:'fold'};
+        } else {
+          checksThisRound.add(bot.id); log(`${bot.name} confirms check in chain.`); renderTable(); return {type:'check'};
+        }
+      }
+      checksThisRound.add(bot.id); log(`${bot.name} checks.`); renderTable(); return {type:'check'};
+    }
+  }
+}
+
+/* Evaluator (7-card) */
+function evaluateHand(cards7){
+  const map={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+  const vals = cards7.map(c=>map[c.r]).sort((a,b)=>a-b);
+  const suits = {}; cards7.forEach(c=>suits[c.s]=(suits[c.s]||0)+1);
+  const counts = {}; vals.forEach(v=>counts[v]=(counts[v]||0)+1);
+  const groups = Object.entries(counts).map(([v,c])=>({v:Number(v),c})).sort((a,b)=>b.c-a.c||b.v-a.v);
+  const flush = Object.values(suits).some(n=>n>=5);
+  let straight=false, highStraight=0;
+  const uniq = [...new Set(vals)];
+  for (let i=uniq.length-1;i>=4;i--){
+    const w = uniq.slice(i-4,i+1);
+    if (w.length===5 && w[4]-w[0]===4){ straight=true; highStraight=w[4]; break; }
+  }
+  if (!straight){ const wheel=[14,2,3,4,5]; if (wheel.every(v=>uniq.includes(v))){ straight=true; highStraight=5; } }
+  const maxGroup = groups[0] ? groups[0].c : 0;
+  if (straight && flush) return {rank:8,t:highStraight};
+  if (maxGroup===4) return {rank:7,t:groups[0].v};
+  if (groups[0] && groups[0].c===3 && groups[1] && groups[1].c===2) return {rank:6,t:groups[0].v};
+  if (flush) return {rank:5,t:Math.max(...vals)};
+  if (straight) return {rank:4,t:highStraight};
+  if (maxGroup===3) return {rank:3,t:groups[0].v};
+  if (groups[0] && groups[0].c===2 && groups[1] && groups[1].c===2) return {rank:2,t:Math.max(groups[0].v,groups[1].v)};
+  if (maxGroup===2) return {rank:1,t:groups[0].v};
+  return {rank:0,t:Math.max(...vals)};
+}
+
+/* Showdown */
+async function showdown(){
+  players.forEach(p=>{ if (!p.folded) log(`${p.name} shows ${p.cards.map(c=>c.r+c.s).join(' ')}`); });
+  const contenders = players.filter(p=>!p.folded);
+  const results = contenders.map(p=>({player:p,score:evaluateHand([...p.cards,...community])}));
+  results.sort((a,b)=> b.score.rank - a.score.rank || b.score.t - a.score.t);
+  const winner = results[0];
+  winner.player.balance += pot;
+  log(`${winner.player.name} wins $${pot} with rank ${winner.score.rank} (t:${winner.score.t}).`);
+  pot = 0;
+  saveBalances();
+  renderTable();
+  roundStage = 'idle';
+  el('status').textContent = 'Hand complete. Click New Hand to play again.';
+  dealerIndex = (dealerIndex + 1) % MAX_PLAYERS;
+}
+
+/* Controls wiring */
+el('btnDeal').addEventListener('click', async ()=>{ if (bettingActive){ alert('Finish current hand first.'); return; } await newHand(); });
+el('btnStart').addEventListener('click', ()=> {
+  const nick = (el('nick').value || 'You').trim();
+  const seats = Number(el('seats').value) || 4;
+  const buyin = Number(el('buyin').value) || 1000;
+  const useBots = el('useBots').checked;
+  window.CHAIN_RULE_ENABLED = !!el('enableChain').checked;
+  initPlayers(nick,seats,buyin,useBots);
+  renderPreviewSeats(seats);
+  el('app').style.display = 'block';
+  el('playerName').textContent = nick;
+  newHand();
+});
+el('btnDemo').addEventListener('click', ()=> { el('useBots').checked = true; el('enableChain').checked = true; el('btnStart').click(); });
+
+/* Back button: clean then navigate */
+(function wireBack(){
+  const back = el('btnBack');
+  if (!back) return;
+  const handler = () => {
+    try { if (reactionTimer) clearTimeout(reactionTimer); reactionTimer = null; } catch(e){}
+    try { if (humanResolve) { humanResolve({type:'back'}); humanResolve = null; } } catch(e){}
+    bettingActive = false; chainActive = false; checksThisRound.clear();
+    window.location.href = 'index.html';
+  };
+  back.replaceWith(back.cloneNode(true));
+  el('btnBack').addEventListener('click', handler);
+})();
+
+/* Boot preview */
+(function boot(){
+  el('seats').addEventListener('change', ()=> renderPreviewSeats(Number(el('seats').value)));
+  renderPreviewSeats(Number(el('seats').value));
+  log('Ready. Click Start Local Table to begin.');
+})();
+
+</script>
+</body>
+</html>

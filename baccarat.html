@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Baccarat</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0b0b0b;
+      font-family: sans-serif;
+      color: #fff;
+      text-align: center;
+    }
+    header {
+      padding: 20px;
+      font-size: 30px;
+      font-weight: bold;
+      background: #111;
+      border-bottom: 2px solid purple;
+      color: violet;
+      text-shadow: 0 0 10px purple;
+    }
+    #balance {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    #hands {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+      gap: 40px;
+    }
+    .hand {
+      background: #222;
+      padding: 10px;
+      border-radius: 10px;
+      border: 2px solid violet;
+      min-width: 150px;
+    }
+    .hand h3 {
+      margin-top: 0;
+    }
+    .cards {
+      font-size: 32px;
+      margin: 10px 0;
+    }
+    input, select {
+      padding: 6px;
+      margin: 5px;
+      border-radius: 4px;
+      border: none;
+      font-size: 14px;
+    }
+    button {
+      background: purple;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: violet;
+      color: #000;
+    }
+    #result {
+      font-size: 20px;
+      margin-top: 20px;
+      color: gold;
+      text-shadow: 0 0 5px gold;
+    }
+  </style>
+</head>
+<body>
+  <header>🃍 Baccarat</header>
+  <div id="balance">Balance: $<span id="balanceAmount">1000</span></div>
+  <input type="number" id="betAmount" placeholder="Bet amount" min="1" />
+  <select id="betTarget">
+    <option value="player">Bet on Player</option>
+    <option value="banker">Bet on Banker</option>
+    <option value="tie">Bet on Tie</option>
+  </select>
+  <button onclick="deal()">Deal</button>
+  <button onclick="goBack()">🔙 Back to Casino</button>
+  <div id="hands">
+    <div class="hand">
+      <h3>Player</h3>
+      <div class="cards" id="playerCards"></div>
+      <div id="playerTotal"></div>
+    </div>
+    <div class="hand">
+      <h3>Banker</h3>
+      <div class="cards" id="bankerCards"></div>
+      <div id="bankerTotal"></div>
+    </div>
+  </div>
+  <div id="result"></div>
+
+  <script>
+    let balance = parseInt(localStorage.getItem('slotsBalance')) || 1000;
+    const balanceEl = document.getElementById('balanceAmount');
+    const playerCardsEl = document.getElementById("playerCards");
+    const bankerCardsEl = document.getElementById("bankerCards");
+    const playerTotalEl = document.getElementById("playerTotal");
+    const bankerTotalEl = document.getElementById("bankerTotal");
+    const resultEl = document.getElementById("result");
+
+    let deck = [];
+    let playerHand = [];
+    let bankerHand = [];
+
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance;
+      localStorage.setItem('slotsBalance', balance);
+    }
+    updateBalanceDisplay();
+
+    function createDeck() {
+      const suits = ["♠", "♥", "♦", "♣"];
+      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      deck = [];
+      for (let suit of suits) {
+        for (let value of values) {
+          deck.push({ value, suit });
+        }
+      }
+      deck = deck.sort(() => Math.random() - 0.5);
+    }
+
+    function getCardValue(card) {
+      if (["10", "J", "Q", "K"].includes(card.value)) return 0;
+      if (card.value === "A") return 1;
+      return parseInt(card.value);
+    }
+
+    function getHandTotal(hand) {
+      const sum = hand.reduce((acc, card) => acc + getCardValue(card), 0);
+      return sum % 10;
+    }
+
+    function renderHands() {
+      playerCardsEl.textContent = playerHand.map(c => c.value + c.suit).join(" ");
+      bankerCardsEl.textContent = bankerHand.map(c => c.value + c.suit).join(" ");
+      playerTotalEl.textContent = `Total: ${getHandTotal(playerHand)}`;
+      bankerTotalEl.textContent = `Total: ${getHandTotal(bankerHand)}`;
+    }
+
+    function deal() {
+      const betAmount = parseInt(document.getElementById("betAmount").value);
+      const betTarget = document.getElementById("betTarget").value;
+      if (isNaN(betAmount) || betAmount <= 0) {
+        alert("Enter a valid bet amount.");
+        return;
+      }
+      if (balance < betAmount) {
+        alert("Not enough balance.");
+        return;
+      }
+
+      balance -= betAmount;
+      updateBalanceDisplay();
+      resultEl.textContent = "";
+      createDeck();
+      playerHand = [deck.pop(), deck.pop()];
+      bankerHand = [deck.pop(), deck.pop()];
+      renderHands();
+
+      let playerTotal = getHandTotal(playerHand);
+      let bankerTotal = getHandTotal(bankerHand);
+
+      // Third card rules simplified
+      if (playerTotal <= 5) {
+        playerHand.push(deck.pop());
+        playerTotal = getHandTotal(playerHand);
+      }
+      if (bankerTotal <= 5) {
+        bankerHand.push(deck.pop());
+        bankerTotal = getHandTotal(bankerHand);
+      }
+
+      renderHands();
+
+      let winner = "tie";
+      if (playerTotal > bankerTotal) winner = "player";
+      else if (bankerTotal > playerTotal) winner = "banker";
+
+      let payout = 0;
+      if (betTarget === winner) {
+        payout = betTarget === "tie" ? betAmount * 8 : betAmount * 2;
+        balance += payout;
+        updateBalanceDisplay();
+        resultEl.textContent = `🎉 ${winner.toUpperCase()} wins! Payout: $${payout}`;
+      } else {
+        resultEl.textContent = `❌ ${winner.toUpperCase()} wins. You lost.`;
+      }
+    }
+
+    function goBack() {
+      window.open('index.html','_blank');
+      window.close();
+    }
+  </script>
+</body>
+</html>

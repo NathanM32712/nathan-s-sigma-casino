@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>5×5 Single-Mine Crash</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body {
+      margin:0; padding:24px;
+      font-family:Inter,system-ui,Arial,sans-serif;
+      background:#0e2030; color:#e6eef6;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    h1 {
+      margin:0 0 12px; font-size:24px; color:#f59e0b;
+    }
+    #controls {
+      display:flex; align-items:center; gap:12px; margin-bottom:8px;
+    }
+    .btn {
+      background:#f59e0b; color:#04121a; border:none;
+      padding:8px 16px; border-radius:6px; font-weight:700;
+      cursor:pointer;
+    }
+    .btn.ghost {
+      background:transparent; border:1px solid rgba(255,255,255,0.06);
+      color:inherit;
+    }
+    label.small { font-size:14px; color:#cbd5e1 }
+    .input {
+      background:#1e293b; border:1px solid #334155; color:#e6eef6;
+      border-radius:4px; padding:4px 8px; margin-left:4px;
+    }
+    #balance {
+      font-size:16px; color:#38bdf8; margin-right:12px;
+      font-weight:500;
+    }
+    #info { font-size:16px; color:#a3e635; margin-bottom:4px }
+    #status { font-size:14px; color:#cbd5e1; margin-bottom:12px }
+    #grid {
+      display:grid;
+      grid-template-columns:repeat(5,60px);
+      grid-template-rows:repeat(5,60px);
+      gap:8px;
+    }
+    .cell {
+      width:60px; height:60px;
+      background:#1e293b; border:2px solid #334155;
+      border-radius:6px; display:flex; align-items:center;
+      justify-content:center; font-size:20px;
+      user-select:none; cursor:pointer;
+    }
+    .cell.disabled { pointer-events:none; opacity:0.6 }
+    .cell.safe {
+      background:#10b981; color:#04121a;
+      border-color:#047857;
+    }
+    .cell.mine {
+      background:#ef4444; color:#fff;
+      border-color:#b91c1c;
+    }
+  </style>
+</head>
+<body>
+  <h1>5×5 Single-Mine Crash</h1>
+
+  <div id="controls">
+    <button id="backBtn" class="btn ghost">Back</button>
+    <div id="balance">Balance: $0.00</div>
+    <label class="small">
+      Bet:
+      <input id="betAmount" class="input" type="number" min="0.01" step="0.01" value="1.00" style="width:80px"/>
+    </label>
+    <button id="cashOut" class="btn ghost" disabled>Cash Out</button>
+    <button id="newGame" class="btn">New Game</button>
+  </div>
+
+  <div id="info">Multiplier: <span id="multiplier">1.00×</span></div>
+  <div id="status">Enter a bet and start the game.</div>
+
+  <div id="grid"></div>
+
+  <script>
+    // use the same localStorage key as index.html
+    const STORAGE_KEY = 'slotsBalance';
+
+    // read balance (default to 1000)
+    let balance = parseFloat(localStorage.getItem(STORAGE_KEY));
+    if (isNaN(balance)) balance = 1000.00;
+
+    const totalCells = 25;
+    const backBtn    = document.getElementById('backBtn');
+    const betInput   = document.getElementById('betAmount');
+    const cashOutBtn = document.getElementById('cashOut');
+    const newGameBtn = document.getElementById('newGame');
+    const balanceEl  = document.getElementById('balance');
+    const multiplierE= document.getElementById('multiplier');
+    const statusE    = document.getElementById('status');
+    const infoE      = document.getElementById('info');
+    const gridEl     = document.getElementById('grid');
+
+    let mineIdx, safeCount, multiplier, active, currentBet;
+
+    function updateBalanceDisplay(){
+      balanceEl.textContent = 'Balance: $' + balance.toFixed(2);
+      localStorage.setItem(STORAGE_KEY, balance.toFixed(2));
+    }
+
+    function startGame(){
+      // validate bet
+      currentBet = parseFloat(betInput.value);
+      if (isNaN(currentBet) || currentBet <= 0){
+        alert('Enter a valid bet.');
+        return;
+      }
+      if (currentBet > balance){
+        alert('Insufficient balance.');
+        return;
+      }
+      // deduct bet
+      balance -= currentBet;
+      updateBalanceDisplay();
+
+      // init round
+      mineIdx     = Math.floor(Math.random() * totalCells);
+      safeCount   = 0;
+      multiplier  = 1.0;
+      active      = true;
+
+      // UI
+      betInput.disabled   = true;
+      cashOutBtn.disabled = true;
+      multiplierE.textContent = '1.00×';
+      statusE.textContent     = 'Pick a tile!';
+      infoE.textContent       = '';
+
+      // build grid
+      gridEl.innerHTML = '';
+      for (let i=0;i<totalCells;i++){
+        const cell = document.createElement('div');
+        cell.className     = 'cell';
+        cell.dataset.index= i;
+        cell.addEventListener('click', onPick);
+        gridEl.appendChild(cell);
+      }
+    }
+
+    function onPick(e){
+      if (!active) return;
+      const idx = +this.dataset.index;
+
+      if (idx === mineIdx){
+        this.classList.add('mine','disabled');
+        this.textContent = '💣';
+        endGame(false);
+      } else {
+        safeCount++;
+        const inc = 0.01 * Math.pow(2, safeCount - 1);
+        multiplier += inc;
+        multiplierE.textContent = multiplier.toFixed(2) + '×';
+        infoE.textContent       = `Potential: $${(currentBet * multiplier).toFixed(2)}`;
+        this.classList.add('safe','disabled');
+        cashOutBtn.disabled = false;
+      }
+    }
+
+    function endGame(won){
+      active = false;
+      cashOutBtn.disabled = true;
+      betInput.disabled   = false;
+
+      // disable all cells
+      document.querySelectorAll('.cell').forEach(c=>{
+        c.classList.add('disabled');
+        c.removeEventListener('click', onPick);
+      });
+
+      if (won){
+        const payout = currentBet * multiplier;
+        balance += payout;
+        updateBalanceDisplay();
+        statusE.textContent = `💰 You cashed out $${payout.toFixed(2)}!`;
+      } else {
+        statusE.textContent = `💥 Boom! You lost $${currentBet.toFixed(2)}.`;
+      }
+    }
+
+    cashOutBtn.addEventListener('click', ()=>{
+      if (!active) return;
+      endGame(true);
+    });
+
+    newGameBtn.addEventListener('click', startGame);
+    backBtn.addEventListener('click', ()=> window.location.href='index.html');
+
+    // initialize
+    updateBalanceDisplay();
+  </script>
+</body>
+</html>

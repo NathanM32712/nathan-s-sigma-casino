@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mines 3x3</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
+    #grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; justify-content: center; margin-top: 20px; }
+    .cell { width: 100px; height: 100px; background: #333; font-size: 2em; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #555; }
+    .cell.revealed { background: #222; cursor: default; }
+    .cell.mine { background: #900; }
+    .cell.safe { background: #060; }
+    input, button { font-size: 1.2em; margin: 10px; padding: 5px 10px; }
+    #balance { margin-top: 10px; font-size: 1.2em; }
+  </style>
+</head>
+<body>
+  <h1>💣 Mines 3×3</h1>
+  <div>
+    <input id="betInput" type="number" placeholder="Enter bet" />
+    <button id="startBtn">Start Game</button>
+    <button id="cashoutBtn">Cashout</button>
+    <button id="backBtn">Back</button>
+  </div>
+  <div id="balance"></div>
+  <div id="grid"></div>
+
+  <script>
+    const BALANCE_KEY = 'casino_balance';
+    const grid = document.getElementById('grid');
+    const balanceDisplay = document.getElementById('balance');
+    let mines = [];
+    let revealed = [];
+    let bet = 0;
+    let gameActive = false;
+
+    function getBalance() {
+      return parseFloat(localStorage.getItem(BALANCE_KEY) || '1000');
+    }
+
+    function updateBalance(amount) {
+      const newBalance = getBalance() + amount;
+      localStorage.setItem(BALANCE_KEY, newBalance.toFixed(2));
+      balanceDisplay.textContent = `Balance: $${newBalance.toFixed(2)}`;
+    }
+
+    function generateMines(count = 3) {
+      const positions = Array.from({ length: 9 }, (_, i) => i);
+      for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+      }
+      return positions.slice(0, count);
+    }
+
+    function startGame() {
+      bet = parseFloat(document.getElementById('betInput').value);
+      if (bet > 0 && bet <= getBalance()) {
+        updateBalance(-bet);
+        mines = generateMines();
+        revealed = [];
+        gameActive = true;
+        renderGrid();
+      }
+    }
+
+    function revealCell(index) {
+      if (!gameActive || revealed.includes(index)) return;
+      revealed.push(index);
+      const cell = document.getElementById(`cell-${index}`);
+      cell.classList.add('revealed');
+      if (mines.includes(index)) {
+        cell.textContent = '💣';
+        cell.classList.add('mine');
+        gameActive = false;
+      } else {
+        cell.textContent = '✅';
+        cell.classList.add('safe');
+        if (revealed.length === 9 - mines.length) {
+          cashout(); // auto cashout if all safes revealed
+        }
+      }
+    }
+
+    function cashout() {
+      if (!gameActive || revealed.length === 0) return;
+      const payout = parseFloat((bet * (1 + 0.5 * revealed.length)).toFixed(2));
+      updateBalance(payout);
+      gameActive = false;
+      mines.forEach(i => {
+        const cell = document.getElementById(`cell-${i}`);
+        cell.textContent = '💣';
+        cell.classList.add('mine', 'revealed');
+      });
+    }
+
+    function renderGrid() {
+      grid.innerHTML = '';
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.id = `cell-${i}`;
+        cell.onclick = () => revealCell(i);
+        grid.appendChild(cell);
+      }
+    }
+
+    document.getElementById('startBtn').onclick = startGame;
+    document.getElementById('cashoutBtn').onclick = cashout;
+    document.getElementById('backBtn').onclick = () => {
+      window.location.href = 'index.html';
+    };
+
+    updateBalance(0);
+  </script>
+</body>
+</html>

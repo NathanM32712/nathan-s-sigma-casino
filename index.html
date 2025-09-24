@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>No-Risk Casino</title>
+  <style>
+    body {
+      margin: 0;
+      background: #121212;
+      font-family: sans-serif;
+      color: #fff;
+      display: flex;
+      height: 100vh;
+    }
+    #sidebar {
+      width: 250px;
+      background: #1e1e1e;
+      border-right: 2px solid #0f0;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    #main {
+      flex: 1;
+      padding: 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    #userIDDisplay {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #38bdf8;
+      font-weight: bold;
+    }
+    #balance {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .category {
+      margin-bottom: 20px;
+    }
+    .category h2 {
+      color: #0f0;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    .game-button {
+      display: block;
+      width: 100%;
+      background: #0f0;
+      color: #000;
+      border: none;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: left;
+    }
+    .game-button:hover {
+      background: #fff000;
+    }
+    #adminBtn {
+      margin-top: 24px;
+      padding: 8px 16px;
+      font-weight: bold;
+      background: #f59e0b;
+      color: #04121a;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="category">
+      <h2>🎰 Slots</h2>
+      <button class="game-button" onclick="launchGame('Classic Slots')">Classic Slots</button>
+      <button class="game-button" onclick="launchGame('Fruit Frenzy')">Fruit Frenzy</button>
+      <button class="game-button" onclick="launchGame('Vegas Reels')">Vegas Reels</button>
+    </div>
+    <div class="category">
+      <h2>🃏 Table Games</h2>
+      <button class="game-button" onclick="launchGame('Blackjack')">Blackjack</button>
+      <button class="game-button" onclick="launchGame('Baccarat')">Baccarat</button>
+    </div>
+    <div class="category">
+      <h2>♠️ Poker</h2>
+      <button class="game-button" onclick="launchGame('Texas Holdem')">Texas Hold'em</button>
+      <button class="game-button" onclick="launchGame('Omaha')">Omaha</button>
+      <button class="game-button" onclick="launchGame('Five Card Draw')">Five Card Draw</button>
+      <button class="game-button" onclick="launchGame('Three Card Poker')">Three Card Poker</button>
+      <button class="game-button" onclick="launchGame('Video Poker')">Video Poker</button>
+    </div>
+    <div class="category">
+      <h2>⚔️ Risk Games</h2>
+      <button class="game-button" onclick="launchGame('Risk Classic')">Risk Classic</button>
+      <button class="game-button" onclick="launchGame('Risk Blitz')">Risk Blitz</button>
+      <button class="game-button" onclick="launchGame('Risk Royale')">Risk Royale</button>
+      <button class="game-button" onclick="launchGame('Risk Showdown')">Risk Showdown</button>
+      <button class="game-button" onclick="launchGame('Avia Masters')">Avia Masters</button>
+    </div>
+    <div class="category">
+      <h2>💣 Mines</h2>
+      <button class="game-button" onclick="launchGame('Mines 3x3')">Mines 3x3</button>
+      <button class="game-button" onclick="launchGame('Mines 5x5')">Mines 5x5</button>
+      <button class="game-button" onclick="launchGame('Mines Pro')">Mines Pro</button>
+    </div>
+    <div class="category">
+      <h2>📉 Limbo</h2>
+      <button class="game-button" onclick="launchGame('Limbo Classic')">Limbo Classic</button>
+      <button class="game-button" onclick="launchGame('Limbo Turbo')">Limbo Turbo</button>
+      <button class="game-button" onclick="launchGame('Limbo Infinite')">Limbo Infinite</button>
+    </div>
+    <div class="category">
+      <h2>🪂 Plinko</h2>
+      <button class="game-button" onclick="launchGame('Plinko Classic')">Plinko Classic</button>
+      <button class="game-button" onclick="launchGame('Plinko Extreme')">Plinko Extreme</button>
+      <button class="game-button" onclick="launchGame('Plinko Chaos')">Plinko Chaos</button>
+    </div>
+    <div class="category">
+      <h2>💥 Crash</h2>
+      <button class="game-button" onclick="launchGame('Crash')">Crash</button>
+      <button class="game-button" onclick="launchGame('Moonshot')">Moonshot</button>
+    </div>
+    <div class="category">
+      <h2>🎮 Arcade</h2>
+      <button class="game-button" onclick="launchGame('Coin Flip')">Coin Flip</button>
+      <button class="game-button" onclick="launchGame('Dice Duel')">Dice Duel</button>
+      <button class="game-button" onclick="launchGame('Lucky Wheel')">Lucky Wheel</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="userIDDisplay">Loading user…</div>
+    <header>Welcome to No-Risk Casino</header>
+    <div id="balance">
+      Balance: $<span id="balanceAmount">1000</span>
+    </div>
+    <p>Select a game from the sidebar to begin.</p>
+  </div>
+
+  <script>
+    // 1) Seed deviceID
+    if (!localStorage.getItem('deviceID')) {
+      const id = 'dev-' + Math.random().toString(36).substr(2);
+      localStorage.setItem('deviceID', id);
+    }
+    const deviceID = localStorage.getItem('deviceID');
+
+    // 2) Retrieve username
+    const username = localStorage.getItem('username') || 'Guest';
+
+    // 3) Show User & Device at top
+    document.getElementById('userIDDisplay').textContent =
+      `User: ${username}  |  Device: ${deviceID}`;
+
+    // 4) Balance logic
+    let balance = parseInt(localStorage.getItem('slotsBalance')) || 1000;
+    const balanceEl = document.getElementById('balanceAmount');
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance;
+      localStorage.setItem('slotsBalance', balance);
+    }
+    updateBalanceDisplay();
+
+    // 5) Launch a game
+    function launchGame(name) {
+      const fileName = name.toLowerCase().replace(/ /g, '-') + '.html';
+      window.open(fileName, '_blank');
+      window.close();
+    }
+
+    // 6) Show Admin button if:
+    //    • deviceID === 'dev-zida27c5pjb', OR
+    //    • username is in adminUsers, OR
+    //    • deviceID is in adminUsers
+    const admins = JSON.parse(localStorage.getItem('adminUsers') || '[]');
+    if (
+      deviceID === 'dev-zida27c5pjb' ||
+      admins.includes(username) ||
+      admins.includes(deviceID)
+    ) {
+      const btn = document.createElement('button');
+      btn.id = 'adminBtn';
+      btn.textContent = '🛠️ Admin Panel';
+      btn.onclick = () => window.location.href = 'admin.html';
+      document.getElementById('main').appendChild(btn);
+    }
+  </script>
+</body>
+</html>

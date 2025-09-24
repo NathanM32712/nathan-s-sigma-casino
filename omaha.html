@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Omaha Night — Local Pot‑Limit Omaha Hi</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{--bg:#06121a;--panel:#0f1720;--accent:#f59e0b;--muted:#9ca3af;--glass:rgba(255,255,255,0.03)}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(180deg,#04111a,#071827);color:#e6eef6}
+  .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+  .card{width:100%;max-width:1100px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:16px;display:grid;grid-template-columns:360px 1fr;gap:16px;box-shadow:0 14px 36px rgba(0,0,0,0.6)}
+  .title{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:10px}
+  .form{background:var(--glass);padding:12px;border-radius:10px;display:flex;flex-direction:column;gap:8px}
+  label{font-size:12px;color:var(--muted)}
+  input[type=text], input[type=number], select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef6}
+  .row{display:flex;gap:8px}
+  .btn{background:var(--accent);color:#04121a;border:none;padding:10px 14px;border-radius:8px;font-weight:800;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#e6eef6}
+  .small{font-size:12px;color:var(--muted)}
+  .preview{background:#071827;border-radius:10px;padding:12px;min-height:320px;display:flex;flex-direction:column;gap:8px}
+  .players-grid{display:flex;gap:8px;flex-wrap:wrap}
+  .player-mini{background:var(--panel);padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);min-width:130px}
+  #app{display:none;padding:12px}
+  header{padding:10px;background:linear-gradient(90deg,#06121a,#0b2633);font-weight:700;color:var(--accent);text-align:center;border-radius:8px}
+  #table{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding:12px}
+  .player{background:var(--panel);border:2px solid rgba(245,158,11,0.12);padding:12px;border-radius:10px;min-width:170px}
+  .you{box-shadow:0 0 0 3px rgba(34,197,94,0.06)}
+  .name{font-weight:700;margin-bottom:6px}
+  .cards{font-size:16px;letter-spacing:6px}
+  .meta{font-size:13px;color:var(--muted);margin-top:6px}
+  #board{display:flex;gap:8px;justify-content:center;padding:12px;min-height:80px}
+  .card-face{width:56px;height:80px;border-radius:6px;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;font-weight:700}
+  #controls{display:flex;gap:8px;justify-content:center;padding:12px;align-items:center;flex-wrap:wrap}
+  input[type=number]{width:110px;padding:8px;border-radius:6px;border:none}
+  .secondary{background:#1f2937}
+  #status{padding:10px;text-align:center;color:#cfe9ff}
+  #log{max-height:180px;overflow:auto;padding:10px;background:#071827;margin:10px;border-radius:8px;font-size:13px}
+  #reactionArea{margin-top:8px;text-align:center}
+  @media(max-width:960px){ .card{grid-template-columns:1fr; padding:12px} }
+</style>
+</head>
+<body>
+
+<div class="wrap" id="startScreen">
+  <div class="card" role="dialog" aria-modal="true">
+    <div>
+      <div class="title">Omaha Night — Pot‑Limit Omaha Hi</div>
+      <div class="subtitle">Each player gets 4 hole cards; must use exactly 2 hole + 3 community; pot‑limit betting.</div>
+
+      <div class="form" aria-label="Start settings">
+        <label>Nickname</label>
+        <input id="nick" type="text" placeholder="Your name" value="You">
+
+        <div class="row">
+          <div style="flex:1">
+            <label>Buy-in</label>
+            <input id="buyin" type="number" min="10" step="10" value="1000">
+          </div>
+          <div style="width:140px">
+            <label>Seats</label>
+            <select id="seats"><option value="6">6-seat</option><option value="4">4-seat</option><option value="9">9-seat</option></select>
+          </div>
+        </div>
+
+        <label><input id="useBots" type="checkbox" checked> Fill seats with bots</label>
+        <label><input id="enableChain" type="checkbox" checked> Enable check-chain rule</label>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="btnCreate" class="btn">Start Local Omaha</button>
+          <button id="btnDemo" class="btn ghost">Quick Demo</button>
+        </div>
+
+        <div class="small" style="margin-top:8px">Check‑chain: when a check originates with no bet, confirmations rotate; when it returns to origin and origin still stands, reveal exactly one community card then open 4–7s reaction window (raise cancels auto progression).</div>
+      </div>
+    </div>
+
+    <div class="preview" aria-hidden="false">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="small">Table Preview</div>
+        <div class="small">Pot · To‑call</div>
+      </div>
+      <div class="players-grid" id="previewSeats"></div>
+      <div style="margin-top:auto" class="small">Start local Pot‑Limit Omaha vs named bots. No server required.</div>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <header>♠️ Omaha Night — Local Table</header>
+
+  <div style="display:flex;align-items:center;gap:12px;padding:10px">
+    <div class="small">Session: local-omaha</div>
+    <div style="margin-left:auto" class="small">Player: <span id="playerName"></span></div>
+    <div><button id="btnBack" class="btn ghost">Back</button></div>
+  </div>
+
+  <div id="table"></div>
+
+  <div id="board" aria-live="polite"></div>
+
+  <div id="controls">
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div>Pot: <span id="pot">0</span></div>
+      <div class="small">To‑call / Current Bet: <span id="toCall">0</span></div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="btnCheck" class="btn">Check</button>
+      <button id="btnCall" class="btn">Call</button>
+      <button id="btnBet" class="btn">Bet</button>
+      <input id="betAmount" type="number" min="1" placeholder="Amount">
+      <button id="btnFold" class="btn secondary">Fold</button>
+      <button id="btnDeal" class="btn secondary">New Hand</button>
+    </div>
+  </div>
+
+  <div id="reactionArea"></div>
+  <div id="status">Waiting.</div>
+  <div id="log"></div>
+</div>
+
+<script>
+/* ---------- Pot‑Limit Omaha (local) single-file implementation
+   - Save as omaha.html
+   - 4 hole cards per player; exactly 2 + 3 community required for final hand.
+   - Pot-limit betting: max raise = pot + toCall (per standard PLO immediate-pot rule).
+   - Check-chain reveals one card per completed chain; 4–7s reaction window.
+   - Local bots, persistent balances.
+*/
+
+/* Utilities */
+const rand = n => Math.floor(Math.random()*n);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const el = id => document.getElementById(id);
+const log = t => { el('log').innerHTML = `<div>${t}</div>` + el('log').innerHTML; };
+
+/* Preview seats */
+function renderPreviewSeats(count=6){
+  const out = el('previewSeats'); out.innerHTML='';
+  const names = ['Marco Calm','Vega Ace','Rosie Flash','Trent Ace','Lina Calm','Gus Flash','Nadia','Royce','Margo'];
+  for (let i=0;i<count;i++){
+    const d=document.createElement('div'); d.className='player-mini';
+    d.innerHTML=`<div style="font-weight:700">${names[i]||'Seat '+(i+1)}</div><div class="small">Balance: $1000</div><div class="small">Status: Waiting</div>`;
+    out.appendChild(d);
+  }
+}
+renderPreviewSeats(6);
+
+/* Constants & state */
+const STORAGE_KEY = 'omaha_balances_v1';
+const REACTION_MIN = 4000, REACTION_MAX = 7000;
+let MAX_PLAYERS = 6;
+let deck = [], players = [], community = [], pot = 0, currentBet = 0;
+let dealerIndex = 0, turnIndex = 0, roundStage = 'preflop', bettingActive = false;
+let checksThisRound = new Set(), checkModeActive = false;
+let chainActive = false, chainOrigin = null, chainPending = [], originalChainOrder = [];
+let reactionTimer = null, reactionEndsAt = 0, flopRevealedCount = 0;
+let humanResolve = null;
+
+/* Persistence */
+function loadBalances(def=1000){
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e){}
+  return Array.from({length:MAX_PLAYERS},_=>def);
+}
+function saveBalances(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(players.map(p=>p.balance))); }catch(e){} }
+
+/* Deck & deal */
+function makeDeck(){
+  const suits=['♠','♥','♦','♣'], ranks=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  deck=[]; for (let s of suits) for (let r of ranks) deck.push({r,s});
+  for (let i=deck.length-1;i>0;i--){ const j=rand(i+1); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+}
+function dealCard(){ return deck.pop(); }
+
+/* Init players (named bots) */
+function initPlayersFromOptions(nick,seats,buyin,useBots){
+  MAX_PLAYERS = seats;
+  const balances = loadBalances(buyin);
+  players = [];
+  const botProfiles = [{suffix:'Calm',baseAggro:0.35,risk:0.28},{suffix:'Ace',baseAggro:0.55,risk:0.5},{suffix:'Flash',baseAggro:0.7,risk:0.68}];
+  const botNames = ['Marco','Vega','Rosie','Trent','Lina','Gus','Nadia','Royce','Margo','Felix'];
+  for (let i=0;i<MAX_PLAYERS;i++){
+    if (i===0) players.push({id:0,name:nick,balance:balances[0]??buyin,bet:0,folded:false,allIn:false,cards:[],isBot:false,aggression:0});
+    else {
+      if (!useBots) players.push({id:i,name:`Seat ${i+1}`,balance:balances[i]??buyin,bet:0,folded:true,allIn:false,cards:[],isBot:false,aggression:0});
+      else { const p = botProfiles[(i-1)%botProfiles.length], n=botNames[(i-1)%botNames.length]; players.push({id:i,name:`${n} ${p.suffix}`,balance:balances[i]??buyin,bet:0,folded:false,allIn:false,cards:[],isBot:true,aggression:0,profile:{...p}}); }
+    }
+  }
+  dealerIndex=0; renderTable();
+}
+
+/* Render */
+function renderTable(){
+  const table = el('table'); table.innerHTML='';
+  players.forEach((p,i)=>{
+    const div = document.createElement('div'); div.className='player'+(i===0?' you':'');
+    if (i===turnIndex && bettingActive) div.classList.add('active');
+    const cardText = i===0 ? p.cards.map(c=>c.r+c.s).join(' ') : (p.isBot ? (p.folded ? 'Folded' : (p.cards.length ? '🂠 🂠 🂠 🂠' : '—')) : p.cards.map(c=>c.r+c.s).join(' '));
+    div.innerHTML = `<div class="name">${p.name}${p.isBot?'<span class="small"> (bot)</span>':''}</div><div class="cards">${cardText}</div><div class="meta">Balance: $${p.balance}${p.allIn?'<span class="small"> (all-in)</span>':''}</div><div class="small">Bet: $${p.bet}${p.folded?'<span class="small"> (folded)</span>':''}</div>`;
+    table.appendChild(div);
+  });
+  el('board').innerHTML = community.map(c=>`<div class="card-face">${c.r+c.s}</div>`).join('');
+  el('pot').textContent = pot; el('toCall').textContent = currentBet; el('playerName').textContent = players[0]?.name||'';
+  updateChainUI();
+}
+
+/* Chain UI */
+function updateChainUI(){
+  if (!chainActive){ el('status').textContent = ''; return; }
+  const next = chainPending[0]!==undefined ? players[chainPending[0]].name : 'origin';
+  el('status').textContent = `Chain origin: ${players[chainOrigin].name} — Next: ${next}`;
+}
+
+/* Helpers */
+function activePlayers(){ return players.filter(p=>!p.folded && !p.allIn); }
+function resetBets(){ players.forEach(p=>p.bet=0); currentBet=0; pot=0; }
+function collectBetsToPot(){ players.forEach(p=>{ pot+=p.bet; p.bet=0; }); }
+function anyActiveExceptOne(){ return players.filter(p=>!p.folded && !p.allIn).length <= 1; }
+
+/* Pot-limit helpers: allowed raise max = pot + toCall (commonly: current pot before call + toCall + callers) */
+function maxRaiseAllowed(toCallNow){
+  // Simple immediate pot definition: pot + toCallNow
+  return pot + toCallNow;
+}
+
+/* Build & start chain */
+function buildChainFrom(origin){
+  const order=[];
+  for (let i=1;i<MAX_PLAYERS;i++){ const idx=(origin+i)%MAX_PLAYERS; const p=players[idx]; if (!p.folded && !p.allIn) order.push(idx); }
+  originalChainOrder=[...order]; return order;
+}
+function startChain(origin){
+  if (!window.CHAIN_RULE_ENABLED) return;
+  chainActive=true; chainOrigin=origin; chainPending=buildChainFrom(origin); checksThisRound.add(origin); checkModeActive=false;
+  log(`${players[origin].name} started check-chain.`); updateChainUI();
+}
+
+/* Complete chain reveal 1 card + reaction window */
+function completeChainAndReact(){
+  chainActive=false;
+  if (roundStage==='preflop'){
+    community.push(dealCard()); flopRevealedCount=Math.min(3,flopRevealedCount+1); log(`One flop card revealed (${flopRevealedCount}/3).`);
+    if (flopRevealedCount===3) roundStage='flop';
+  } else if (roundStage==='flop'){ community.push(dealCard()); roundStage='turn'; log('Turn revealed.'); }
+  else if (roundStage==='turn'){ community.push(dealCard()); roundStage='river'; log('River revealed.'); }
+  renderTable();
+  const ms = REACTION_MIN + Math.floor(Math.random()*(REACTION_MAX-REACTION_MIN+1));
+  reactionEndsAt = Date.now()+ms;
+  el('reactionArea').innerHTML = `Reaction window: ${Math.ceil(ms/1000)}s — fold or raise now <span id="reactionCountdown"></span>`;
+  startReactionCountdown(ms);
+  reactionTimer = setTimeout(()=>{ el('reactionArea').innerHTML=''; log('Reaction ended; proceeding to betting.'); turnIndex=(dealerIndex+1)%MAX_PLAYERS; checksThisRound.clear(); checkModeActive=(currentBet===0); proceedToNextBettingAfterReveal(); }, ms);
+}
+function startReactionCountdown(ms){
+  const cd = el('reactionCountdown'); if (!cd) return;
+  const iv = setInterval(()=>{ const left=Math.max(0, reactionEndsAt-Date.now()); cd.textContent = `(${Math.ceil(left/1000)}s)`; if (left<=0) clearInterval(iv); },200);
+}
+function cancelReactionDueToRaise(){ if (reactionTimer){ clearTimeout(reactionTimer); reactionTimer=null; el('reactionArea').innerHTML=''; log('Raise canceled reaction; resuming betting.'); proceedToNextBettingAfterReveal(); } }
+
+/* Game flow */
+async function newHand(){
+  roundStage='preflop'; flopRevealedCount=0; bettingActive=false;
+  makeDeck(); community=[]; resetBets();
+  players.forEach(p=>{ p.folded=false; p.allIn=false; p.cards=[]; p.bet=0; p.aggression=p.aggression||0; });
+  for (let i=0;i<4;i++) for (let j=0;j<MAX_PLAYERS;j++) players[j].cards.push(dealCard());
+  turnIndex=(dealerIndex+1)%MAX_PLAYERS; currentBet=0; pot=0; checksThisRound.clear(); checkModeActive=(currentBet===0);
+  chainActive=false; chainOrigin=null; chainPending=[];
+  renderTable(); log('New hand dealt. Preflop betting begins.'); await bettingRound();
+}
+
+async function bettingRound(){
+  bettingActive=true; checksThisRound.clear(); checkModeActive=(currentBet===0)&&!chainActive;
+  if (anyActiveExceptOne()){ bettingActive=false; await proceedToNextStage(); return; }
+
+  let needToAct = new Set(players.filter(p=>!p.folded && !p.allIn).map(p=>p.id));
+  if (currentBet>0) needToAct = new Set(players.filter(p=>!p.folded && !p.allIn && p.bet!==currentBet).map(p=>p.id));
+
+  while (needToAct.size>0){
+    if (players[turnIndex].folded || players[turnIndex].allIn){ turnIndex=(turnIndex+1)%MAX_PLAYERS; continue; }
+    const p = players[turnIndex]; renderTable();
+    updateControlsForPlayer(p);
+
+    if (chainActive){
+      if (chainPending.length===0){ completeChainAndReact(); break; }
+      const next = chainPending[0];
+      if (p.id !== next){ turnIndex=(turnIndex+1)%MAX_PLAYERS; continue; }
+      let action = p.isBot ? await botThinkAndAct(p,{chainMode:true}) : await humanActionPromise();
+      if (action && action.type==='check'){ chainPending.shift(); log(`${p.name} confirmed check.`); if (chainPending.length===0){ completeChainAndReact(); break; } turnIndex=(turnIndex+1)%MAX_PLAYERS; continue; }
+      if (action && action.type==='fold'){ chainPending.shift(); p.folded=true; log(`${p.name} folded in chain.`); if (anyActiveExceptOne()){ bettingActive=false; break; } turnIndex=(turnIndex+1)%MAX_PLAYERS; continue; }
+      if (action && (action.type==='raise' || action.type==='call')){ chainActive=false; checksThisRound.clear(); checkModeActive=false; cancelReactionDueToRaise(); }
+    } else {
+      let action = p.isBot ? await botThinkAndAct(p,{chainMode:false}) : await humanActionPromise();
+      if (action && action.type==='raise'){ checksThisRound.clear(); checkModeActive=false; }
+      if (action && action.type==='check' && currentBet===0 && !chainActive && window.CHAIN_RULE_ENABLED){ startChain(p.id); if (chainPending.length===0){ completeChainAndReact(); break; } turnIndex = chainPending[0]; needToAct = new Set(players.filter(x=>!x.folded && !x.allIn && x.bet!==currentBet).map(x=>x.id)); continue; }
+    }
+
+    needToAct = new Set(players.filter(x=>!x.folded && !x.allIn && x.bet!==currentBet).map(x=>x.id));
+    turnIndex=(turnIndex+1)%MAX_PLAYERS;
+    if (anyActiveExceptOne()){ bettingActive=false; break; }
+  }
+
+  collectBetsToPot(); saveBalances(); bettingActive=false; renderTable(); log(`Betting complete. Pot $${pot}.`); await sleep(250); await proceedToNextStage();
+}
+
+async function proceedToNextStage(){
+  if (roundStage==='preflop'){
+    if (flopRevealedCount===0){ community.push(dealCard(),dealCard(),dealCard()); flopRevealedCount=3; }
+    else if (flopRevealedCount<3) { while(flopRevealedCount<3){ community.push(dealCard()); flopRevealedCount++; } }
+    roundStage='flop'; log('Flop revealed.');
+  } else if (roundStage==='flop'){ community.push(dealCard()); roundStage='turn'; log('Turn revealed.'); }
+  else if (roundStage==='turn'){ community.push(dealCard()); roundStage='river'; log('River revealed.'); }
+  else if (roundStage==='river'){ roundStage='showdown'; log('Showdown.'); await showdown(); return; }
+  turnIndex=(dealerIndex+1)%MAX_PLAYERS; currentBet=0; players.forEach(p=>p.bet=0); checksThisRound.clear(); checkModeActive=(currentBet===0); renderTable(); await sleep(250); await bettingRound();
+}
+
+/* Human actions wiring */
+function humanActionPromise(){ return new Promise(res => humanResolve = res); }
+function updateControlsForPlayer(player){
+  const humanTurn = !player.isBot && bettingActive && !player.folded && !player.allIn;
+  const isChainTurn = chainActive && chainPending.length>0 && chainPending[0]===player.id;
+  const active = humanTurn && (!chainActive || isChainTurn);
+  el('btnCheck').disabled = !active; el('btnCall').disabled = !active; el('btnBet').disabled = !active; el('btnFold').disabled = !active; el('betAmount').disabled = !active;
+  if (!active) el('status').textContent = player.isBot ? `Waiting for ${player.name}...` : 'Waiting for others...';
+  else el('status').textContent = chainActive ? 'Chain turn — Check, Fold, or Raise' : 'Your turn — Check, Call, Bet, or Fold';
+}
+
+/* Human button actions (pot-limit) */
+el('btnCheck').addEventListener('click', ()=>{
+  const p = players[0];
+  if (currentBet===0){ checksThisRound.add(p.id); log('You checked.'); if (chainActive && chainPending[0]===p.id){ humanResolve({type:'check'}); return; } if (!chainActive){ humanResolve({type:'check'}); return; } }
+  else { const need=currentBet-p.bet; if (need<=0){ humanResolve({type:'check'}); return; } if (need>=p.balance){ p.bet+=p.balance; p.allIn=true; p.balance=0; log(`You called all-in $${p.bet}.`); } else { p.balance-=need; p.bet+=need; log(`You called $${need}.`); } humanResolve({type:'call'}); }
+  renderTable();
+});
+el('btnCall').addEventListener('click', ()=>{ const p=players[0]; const need=currentBet-p.bet; if (need<=0){ humanResolve({type:'check'}); return; } if (need>=p.balance){ p.bet+=p.balance; p.allIn=true; p.balance=0; log(`You called all-in $${p.bet}.`); } else { p.balance-=need; p.bet+=need; log(`You called $${need}.`); } renderTable(); humanResolve({type:'call'}); });
+el('btnBet').addEventListener('click', ()=>{
+  const p = players[0];
+  const amt = Number(el('betAmount').value) || 0;
+  if (amt <= 0){ alert('Enter bet amount'); return; }
+  const toCall = Math.max(0, currentBet - p.bet);
+  const maxAllowed = maxRaiseAllowed(toCall);
+  // In pot-limit the total put must not exceed toCall + maxAllowed; here we enforce raise amount <= maxAllowed
+  if (amt > p.balance){ alert('Exceeds your balance'); return; }
+  const totalPut = toCall + amt;
+  if (amt > maxAllowed){ alert(`Pot-limit: max raise is ${maxAllowed}`); return; }
+  // apply bet
+  p.balance -= totalPut; p.bet += totalPut;
+  if (p.balance <= 0){ p.allIn = true; }
+  currentBet = p.bet;
+  log(`You bet $${amt} (total contributed this round: $${p.bet}).`);
+  checksThisRound.clear(); checkModeActive=false; renderTable();
+  humanResolve({type:'raise'});
+  cancelReactionDueToRaise();
+});
+el('btnFold').addEventListener('click', ()=>{ const p=players[0]; p.folded=true; log('You folded.'); renderTable(); humanResolve({type:'fold'}); });
+
+/* Bot AI (public-only) */
+async function botThinkAndAct(bot, opts={chainMode:false}){
+  await sleep(800 + Math.random()*1800);
+  if (opts.chainMode && chainPending.length>0 && chainPending[0]!==bot.id) return {type:'noop'};
+  const toCall = Math.max(0, currentBet - bot.bet);
+  const potOdds = toCall>0 ? (toCall/(pot+toCall)) : 0;
+  const baseAggro = bot.profile?.baseAggro ?? 0.5;
+  const risk = bot.profile?.risk ?? 0.4;
+  const baseline = Math.random();
+  const foldBias = 0.25 - baseline*0.1 + potOdds;
+  const raiseBias = 0.75 + baseline*0.15 + risk*0.1 - (toCall/(Math.max(1,bot.balance+toCall))*0.2);
+
+  if (toCall>0){
+    const r=Math.random();
+    if (r > raiseBias && bot.balance > toCall + 10){
+      const raiseBy = Math.min(maxRaiseAllowed(toCall), Math.max(10, Math.floor(bot.balance/6)));
+      const put = Math.min(bot.balance, toCall + raiseBy);
+      bot.bet += put; bot.balance -= put; if (bot.balance<=0) bot.allIn=true; currentBet = bot.bet; log(`${bot.name} raises to $${bot.bet}.`); return {type:'raise'};
+    } else if (r < foldBias){ bot.folded=true; log(`${bot.name} folded.`); return {type:'fold'}; }
+    const callAmt = Math.min(bot.balance, toCall); bot.bet += callAmt; bot.balance -= callAmt; if (bot.balance<=0) bot.allIn=true; log(`${bot.name} called $${callAmt}.`); return {type:'call'};
+  } else {
+    const r=Math.random();
+    if (r > raiseBias && bot.balance > 10){
+      const amt = Math.min(Math.max(10, Math.floor(bot.balance/10)), maxRaiseAllowed(0));
+      bot.bet += amt; bot.balance -= amt; if (bot.balance<=0) bot.allIn=true; currentBet = bot.bet; log(`${bot.name} bets $${amt}.`); checksThisRound.clear(); checkModeActive=false; return {type:'raise'};
+    }
+    if (!chainActive && currentBet===0){ checksThisRound.add(bot.id); log(`${bot.name} checks.`); return {type:'check'}; }
+    if (chainActive && chainPending[0]===bot.id){
+      const r2=Math.random();
+      if (r2 > raiseBias && bot.balance>10){ const amt = Math.min(Math.max(10,Math.floor(bot.balance/10)), maxRaiseAllowed(0)); bot.bet+=amt; bot.balance-=amt; currentBet=bot.bet; chainActive=false; checksThisRound.clear(); checkModeActive=false; log(`${bot.name} raises $${amt} in chain; chain cancelled.`); return {type:'raise'} }
+      if (r2 < foldBias){ bot.folded=true; log(`${bot.name} folded in chain.`); return {type:'fold'} }
+      checksThisRound.add(bot.id); log(`${bot.name} confirms check.`); return {type:'check'}
+    }
+    checksThisRound.add(bot.id); log(`${bot.name} checks.`); return {type:'check'};
+  }
+}
+
+/* Hand evaluation for Omaha: exactly 2 from hole + 3 community must be used.
+   We'll brute force: enumerate all 2-of-4 hole combos and 3-of-community combos, evaluate best 5-card hand.
+*/
+function combinations(arr, k){
+  const res=[]; const n=arr.length;
+  function rec(start,cur){
+    if (cur.length===k){ res.push([...cur]); return; }
+    for (let i=start;i<n;i++){ cur.push(arr[i]); rec(i+1,cur); cur.pop(); }
+  }
+  rec(0,[]); return res;
+}
+function evaluate5(cards){
+  // reuse evaluator from ranks/suits
+  const map={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+  const vals = cards.map(c=>map[c.r]).sort((a,b)=>a-b);
+  const suits = {}; cards.forEach(c=>suits[c.s]=(suits[c.s]||0)+1);
+  const counts = {}; vals.forEach(v=>counts[v]=(counts[v]||0)+1);
+  const groups = Object.entries(counts).map(([v,c])=>({v:Number(v),c})).sort((a,b)=>b.c-a.c||b.v-a.v);
+  const flush = Object.values(suits).some(n=>n>=5);
+  let straight=false, high=0;
+  const uniq=[...new Set(vals)];
+  for (let i=uniq.length-1;i>=4;i--){ const w=uniq.slice(i-4,i+1); if (w.length===5 && w[4]-w[0]===4){ straight=true; high=w[4]; break; } }
+  if (!straight){ const wheel=[14,2,3,4,5]; if (wheel.every(v=>uniq.includes(v))){ straight=true; high=5; } }
+  const maxG = groups[0]?groups[0].c:0;
+  if (straight && flush) return {rank:8,t:high};
+  if (maxG===4) return {rank:7,t:groups[0].v};
+  if (groups[0]&&groups[0].c===3 && groups[1]&&groups[1].c===2) return {rank:6,t:groups[0].v};
+  if (flush) return {rank:5,t:Math.max(...vals)};
+  if (straight) return {rank:4,t:high};
+  if (maxG===3) return {rank:3,t:groups[0].v};
+  if (groups[0]&&groups[0].c===2 && groups[1]&&groups[1].c===2) return {rank:2,t:Math.max(groups[0].v,groups[1].v)};
+  if (maxG===2) return {rank:1,t:groups[0].v};
+  return {rank:0,t:Math.max(...vals)};
+}
+function bestOmahaHand(hole4, communityCards){
+  const holeComb = combinations(hole4,2);
+  const communityComb = combinations(communityCards,3);
+  let best = null;
+  for (const h of holeComb){
+    for (const c of communityComb){
+      const five = [...h,...c];
+      const ev = evaluate5(five);
+      if (!best || ev.rank > best.rank || (ev.rank===best.rank && ev.t > best.t)) best = ev;
+    }
+  }
+  return best;
+}
+
+/* Showdown: compute winners by best Omaha hand */
+async function showdown(){
+  players.forEach(p=>{ if (!p.folded) log(`${p.name} shows ${p.cards.map(c=>c.r+c.s).join(' ')}`); });
+  const contenders = players.filter(p=>!p.folded);
+  const results = contenders.map(p=>({player:p,score:bestOmahaHand(p.cards,community)}));
+  results.sort((a,b)=> b.score.rank - a.score.rank || b.score.t - a.score.t);
+  const winner = results[0];
+  winner.player.balance += pot;
+  log(`${winner.player.name} wins $${pot} with rank ${winner.score.rank} (${winner.score.t}).`);
+  pot = 0; saveBalances(); renderTable();
+  roundStage='preflop'; el('status').textContent='Hand complete.'; dealerIndex=(dealerIndex+1)%MAX_PLAYERS;
+}
+
+/* Controls: New Hand */
+el('btnDeal').addEventListener('click', async ()=>{ if (bettingActive){ alert('Finish current hand first'); return; } await newHand(); });
+
+/* Start wiring */
+el('btnCreate').addEventListener('click', ()=> startLocal(false));
+el('btnDemo').addEventListener('click', ()=> startLocal(true));
+function startLocal(quickDemo){
+  const nick=(el('nick').value||'You').trim();
+  const seats = Number(el('seats').value)||6;
+  const buyin = Number(el('buyin').value)||1000;
+  const useBots = el('useBots').checked || quickDemo;
+  const chain = el('enableChain').checked;
+  window.CHAIN_RULE_ENABLED = !!chain;
+  el('startScreen').style.display='none'; el('app').style.display='block';
+  initPlayersFromOptions(nick,seats,buyin,useBots);
+  newHand();
+}
+
+/* Back button: navigate to index.html safely */
+(function wireBack(){
+  function handler(e){
+    e && e.preventDefault && e.preventDefault();
+    try{ if (reactionTimer){ clearTimeout(reactionTimer); reactionTimer=null; } }catch(e){}
+    try{ if (humanResolve){ humanResolve({type:'back'}); humanResolve=null; } }catch(e){}
+    bettingActive=false; chainActive=false; checksThisRound.clear();
+    window.location.href = 'index.html';
+  }
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>{ const b=el('btnBack'); if (b){ b.replaceWith(b.cloneNode(true)); el('btnBack').addEventListener('click',handler); }});
+  else { const b=el('btnBack'); if (b){ b.replaceWith(b.cloneNode(true)); el('btnBack').addEventListener('click',handler); } }
+})();
+
+/* Human promises wiring (buttons) */
+function humanResolveAction(obj){ if (humanResolve){ humanResolve(obj); humanResolve=null; } }
+
+/* Safe human action listeners already wired above to call humanResolve(...) */
+
+/* Boot preview */
+(function boot(){ const seatsSelect = el('seats'); renderPreviewSeats(Number(seatsSelect.value)); seatsSelect.addEventListener('change', ()=> renderPreviewSeats(Number(seatsSelect.value))); log('Ready. Start local Pot‑Limit Omaha.'); })();
+
+</script>
+</body>
+</html>

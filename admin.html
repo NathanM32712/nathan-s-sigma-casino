@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
+    input, button { font-size: 1em; margin: 10px; padding: 5px 15px; }
+    #adminPanel { display: none; margin-top: 20px; }
+    .adminBox { margin: 5px; padding: 5px; background: #222; border: 1px solid #555; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Admin Access</h1>
+  <div id="loginPanel">
+    <input id="userID" placeholder="Enter your ID" />
+    <input id="passwordInput" placeholder="Enter password" />
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="adminPanel">
+    <h2>✅ Approved Admins</h2>
+    <div id="adminList"></div>
+
+    <h2>💰 Balance Controls</h2>
+    <input id="balanceInput" type="number" min="0" placeholder="Enter new balance" />
+    <button onclick="setBalance()">Set Balance</button>
+    <button onclick="resetBalance()">Reset to $1000</button>
+
+    <h2>🔙 Navigation</h2>
+    <button onclick="goBack()">Back to Homepage</button>
+  </div>
+
+  <script>
+    const ENCODED_PASSWORD = "Mzgszm'h-hfkvi-hvxivg-hrtnz-kzhhdliw";
+    const PERMANENT_ADMINS = ['dev-epbg5mcqxzp', 'dev-zida27c5pjb'];
+
+    function flipAlphabet(text) {
+      const flip = c => {
+        const isUpper = c >= 'A' && c <= 'Z';
+        const isLower = c >= 'a' && c <= 'z';
+        if (isUpper) return String.fromCharCode(155 - c.charCodeAt(0));
+        if (isLower) return String.fromCharCode(219 - c.charCodeAt(0));
+        return c;
+      };
+      return text.split('').map(flip).join('');
+    }
+
+    function getAdmins() {
+      return JSON.parse(localStorage.getItem('approvedAdmins') || '[]');
+    }
+
+    function saveAdmins(list) {
+      localStorage.setItem('approvedAdmins', JSON.stringify(list));
+    }
+
+    function login() {
+      const userID = document.getElementById('userID').value.trim();
+      const password = document.getElementById('passwordInput').value.trim();
+      if (!userID || !password) return alert("Enter both ID and password");
+
+      if (PERMANENT_ADMINS.includes(userID)) {
+        grantAccess(userID);
+        return;
+      }
+
+      const flipped = flipAlphabet(password);
+      if (flipped === ENCODED_PASSWORD) {
+        grantAccess(userID);
+      } else {
+        alert("Incorrect password.");
+      }
+    }
+
+    function grantAccess(userID) {
+      const admins = getAdmins();
+      if (!admins.includes(userID)) {
+        admins.push(userID);
+        saveAdmins(admins);
+      }
+      showAdminPanel();
+    }
+
+    function removeAdmin(userID) {
+      const admins = getAdmins().filter(id => id !== userID);
+      saveAdmins(admins);
+      renderAdminList();
+    }
+
+    function renderAdminList() {
+      const list = document.getElementById('adminList');
+      list.innerHTML = '';
+      getAdmins().forEach(id => {
+        const box = document.createElement('div');
+        box.className = 'adminBox';
+        box.innerHTML = `${id} <button onclick="removeAdmin('${id}')">Remove</button>`;
+        list.appendChild(box);
+      });
+    }
+
+    function showAdminPanel() {
+      document.getElementById('loginPanel').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      renderAdminList();
+    }
+
+    function resetBalance() {
+      localStorage.setItem('casino_balance', '1000');
+      alert("Balance reset to $1000");
+    }
+
+    function setBalance() {
+      const val = document.getElementById('balanceInput').value.trim();
+      const num = parseFloat(val);
+      if (isNaN(num) || num < 0) {
+        alert("Please enter a valid positive number.");
+        return;
+      }
+      localStorage.setItem('casino_balance', num.toString());
+      alert(`Balance set to $${num}`);
+    }
+
+    function goBack() {
+      window.location.href = 'index.html';
+    }
+
+    // Auto-login if permanent admin
+    const autoID = localStorage.getItem('user_id');
+    if (PERMANENT_ADMINS.includes(autoID)) {
+      grantAccess(autoID);
+    }
+
+    // Save user ID for session
+    document.getElementById('userID').addEventListener('change', e => {
+      localStorage.setItem('user_id', e.target.value.trim());
+    });
+  </script>
+</body>
+</html>

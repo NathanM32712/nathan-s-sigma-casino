@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Classic Slots</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      font-family: sans-serif;
+      color: #fff;
+      text-align: center;
+    }
+    header {
+      padding: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      background: #222;
+      border-bottom: 2px solid gold;
+    }
+    #balance {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    #slot {
+      display: flex;
+      justify-content: center;
+      margin: 30px 0;
+    }
+    .reel {
+      width: 80px;
+      height: 80px;
+      margin: 0 10px;
+      overflow: hidden;
+      border: 2px solid gold;
+      border-radius: 10px;
+      background: #333;
+      position: relative;
+    }
+    .strip {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      animation: none;
+      font-size: 40px;
+      text-align: center;
+    }
+    @keyframes scroll {
+      0% { top: 0; }
+      100% { top: -480px; }
+    }
+    input {
+      padding: 6px;
+      margin: 5px;
+      border-radius: 4px;
+      border: none;
+      font-size: 14px;
+    }
+    button {
+      background: gold;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #fff000;
+    }
+    #result {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>🎰 Classic Slots</header>
+  <div id="balance">Balance: $<span id="balanceAmount">1000</span></div>
+  <div id="slot">
+    <div class="reel"><div class="strip" id="strip1"></div></div>
+    <div class="reel"><div class="strip" id="strip2"></div></div>
+    <div class="reel"><div class="strip" id="strip3"></div></div>
+  </div>
+  <input type="number" id="betAmount" placeholder="Bet amount" min="1" />
+  <button onclick="spin()">Spin</button>
+  <button onclick="goBack()">🔙 Back to Casino</button>
+  <div id="result"></div>
+
+  <script>
+    let balance = parseInt(localStorage.getItem('slotsBalance')) || 1000;
+    const balanceEl = document.getElementById('balanceAmount');
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance;
+      localStorage.setItem('slotsBalance', balance);
+    }
+    updateBalanceDisplay();
+
+    const symbols = ["🍒", "💎", "🔔", "🍋", "🍉", "7️⃣"];
+    const strips = [document.getElementById("strip1"), document.getElementById("strip2"), document.getElementById("strip3")];
+    const resultEl = document.getElementById("result");
+
+    function spin() {
+      const betAmount = parseInt(document.getElementById("betAmount").value);
+      if (isNaN(betAmount) || betAmount <= 0) {
+        alert("Enter a valid bet amount.");
+        return;
+      }
+      if (balance < betAmount) {
+        alert("Not enough balance.");
+        return;
+      }
+
+      balance -= betAmount;
+      updateBalanceDisplay();
+      resultEl.textContent = "Spinning...";
+
+      const outcome = [];
+
+      strips.forEach((strip, i) => {
+        const spinSymbols = [];
+        for (let j = 0; j < 12; j++) {
+          spinSymbols.push(symbols[Math.floor(Math.random() * symbols.length)]);
+        }
+        const finalSymbol = spinSymbols[spinSymbols.length - 1];
+        outcome.push(finalSymbol);
+        strip.innerHTML = spinSymbols.map(s => `<div>${s}</div>`).join("");
+        strip.style.top = "0px";
+        strip.style.animation = "scroll 0.5s ease-in-out";
+        setTimeout(() => {
+          strip.style.animation = "none";
+          strip.innerHTML = `<div>${finalSymbol}</div>`;
+        }, 500 + i * 100);
+      });
+
+      setTimeout(() => {
+        if (outcome[0] === outcome[1] && outcome[1] === outcome[2]) {
+          const payout = betAmount * 10;
+          balance += payout;
+          updateBalanceDisplay();
+          resultEl.textContent = `🎉 Jackpot! ${outcome.join(" ")} — You won $${payout}`;
+        } else {
+          resultEl.textContent = `❌ No match. Try again!`;
+        }
+      }, 1000);
+    }
+
+    function goBack() {
+      window.open('index.html','_blank');
+      window.close();
+    }
+  </script>
+</body>
+</html>

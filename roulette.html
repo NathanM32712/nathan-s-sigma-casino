@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Roulette</title>
+  <style>
+    body {
+      margin: 0;
+      background: #121212;
+      font-family: sans-serif;
+      color: #fff;
+      text-align: center;
+    }
+    header {
+      padding: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      background: #1e1e1e;
+      border-bottom: 2px solid gold;
+    }
+    #balance {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    #wheel-container {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      margin: 20px auto;
+    }
+    #wheel {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 10px solid gold;
+      transition: transform 3s ease-out;
+    }
+    #ball {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      top: 190px;
+      left: 190px;
+      transform-origin: 10px 10px;
+      transition: transform 3s ease-out;
+    }
+    #controls {
+      margin-top: 20px;
+    }
+    .bet-button {
+      background: #0f0;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      margin: 5px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .bet-button:hover {
+      background: #fff000;
+    }
+    input {
+      padding: 6px;
+      margin: 5px;
+      border-radius: 4px;
+      border: none;
+      font-size: 14px;
+    }
+    #result {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+    #back {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <header>🎡 Roulette</header>
+  <div id="balance">Balance: $<span id="balanceAmount">1000</span></div>
+  <div id="wheel-container">
+    <img id="wheel" src="c:/Users/natha/Downloads/european-roulette-wheel-rzzfd4j7dv4s0nny.png" alt="Roulette Wheel" />
+    <div id="ball"></div>
+  </div>
+  <div id="controls">
+    <input type="number" id="betAmount" placeholder="Bet amount" min="1" />
+    <div>
+      <button class="bet-button" onclick="placeColorBet('red')">Bet Red</button>
+      <button class="bet-button" onclick="placeColorBet('black')">Bet Black</button>
+      <button class="bet-button" onclick="placeColorBet('green')">Bet Green</button>
+    </div>
+    <div>
+      <input type="number" id="numberBet" placeholder="Bet on number (0–36)" min="0" max="36" />
+      <button class="bet-button" onclick="placeNumberBet()">Place Number Bet</button>
+    </div>
+    <button class="bet-button" onclick="spin()">Spin</button>
+  </div>
+  <div id="result"></div>
+  <div id="back">
+    <button class="bet-button" onclick="goBack()">🔙 Back to Casino</button>
+  </div>
+
+  <script>
+    let balance = parseInt(localStorage.getItem('slotsBalance')) || 1000;
+    const balanceEl = document.getElementById('balanceAmount');
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance;
+      localStorage.setItem('slotsBalance', balance);
+    }
+    updateBalanceDisplay();
+
+    const wheel = document.getElementById("wheel");
+    const ball = document.getElementById("ball");
+    const redNumbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+    const blackNumbers = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
+    const segments = Array.from({ length: 37 }, (_, i) => i);
+    let colorBet = null;
+    let numberBet = null;
+
+    function placeColorBet(color) {
+      colorBet = color;
+      numberBet = null;
+      resultEl.textContent = `🎯 Bet placed on ${color.toUpperCase()}`;
+    }
+
+    function placeNumberBet() {
+      const val = parseInt(document.getElementById("numberBet").value);
+      if (isNaN(val) || val < 0 || val > 36) {
+        alert("Enter a valid number between 0 and 36.");
+        return;
+      }
+      numberBet = val;
+      colorBet = null;
+      resultEl.textContent = `🎯 Bet placed on number ${val}`;
+    }
+
+    function spin() {
+      const betAmount = parseInt(document.getElementById("betAmount").value);
+      if (isNaN(betAmount) || betAmount <= 0) {
+        alert("Enter a valid bet amount.");
+        return;
+      }
+      if (balance < betAmount) {
+        alert("Not enough balance to bet that amount.");
+        return;
+      }
+
+      balance -= betAmount;
+      updateBalanceDisplay();
+      resultEl.textContent = "Spinning...";
+
+      const totalSpins = 5;
+      const segmentAngle = 360 / segments.length;
+      const winningIndex = Math.floor(Math.random() * segments.length);
+      const finalAngle = totalSpins * 360 + winningIndex * segmentAngle;
+
+      wheel.style.transform = `rotate(${finalAngle}deg)`;
+      ball.style.transform = `rotate(${finalAngle}deg) translateX(160px)`;
+
+      setTimeout(() => {
+        const winningNumber = segments[winningIndex];
+        const color = winningNumber === 0 ? "green" : redNumbers.includes(winningNumber) ? "red" : "black";
+        let payout = 0;
+        if (colorBet && colorBet === color) payout = betAmount * 2;
+        if (numberBet !== null && numberBet === winningNumber) payout = betAmount * 36;
+        if (payout > 0) {
+          balance += payout;
+          updateBalanceDisplay();
+          resultEl.textContent = `🎉 You won! Number ${winningNumber} (${color.toUpperCase()}) — Payout: $${payout}`;
+        } else {
+          resultEl.textContent = `❌ You lost. Number ${winningNumber} (${color.toUpperCase()})`;
+        }
+        colorBet = null;
+        numberBet = null;
+      }, 3000);
+    }
+
+    function goBack() {
+      window.open('index.html','_blank');
+      window.close();
+    }
+  </script>
+</body>
+</html>
