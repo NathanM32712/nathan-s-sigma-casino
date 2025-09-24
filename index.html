@@ -33,12 +33,6 @@
       font-weight: bold;
       margin-bottom: 10px;
     }
-    #deviceDisplay {
-      font-size: 16px;
-      margin-bottom: 12px;
-      color: #38bdf8;
-      font-weight: bold;
-    }
     #balance {
       font-size: 18px;
       margin-bottom: 20px;
@@ -132,33 +126,46 @@
 
   <div id="main">
     <header>Welcome to No-Risk Casino</header>
-    <div id="deviceDisplay">Device ID: loading…</div>
-    <div id="balance">Balance: $<span id="balanceAmount">1000</span></div>
+    <div id="balance">Balance: $<span id="balanceAmount">0.00</span></div>
     <p>Select a game from the sidebar to begin.</p>
     <button id="adminBtn" onclick="window.location.href='admin.html'">🛠️ Admin Panel</button>
   </div>
 
   <script>
-    let deviceID = localStorage.getItem('deviceID');
-    if (!deviceID) {
-      deviceID = 'dev-' + Math.random().toString(36).substr(2);
-      localStorage.setItem('deviceID', deviceID);
-    }
-    document.getElementById('deviceDisplay').textContent = `Device ID: ${deviceID}`;
-
-    let balance = parseInt(localStorage.getItem('slotsBalance')) || 1000;
+    const userID = "nathan"; // Replace with dynamic logic if needed
     const balanceEl = document.getElementById('balanceAmount');
-    function updateBalanceDisplay() {
-      balanceEl.textContent = balance;
-      localStorage.setItem('slotsBalance', balance);
+    let balance = 0;
+
+    function syncBalanceFromPublic() {
+      fetch("https://yourdomain.com/balances.json") // Replace with your actual URL
+        .then(res => res.json())
+        .then(data => {
+          if (data[userID] !== undefined) {
+            balance = parseFloat(data[userID]);
+          } else {
+            balance = parseFloat(localStorage.getItem("slotsBalance")) || 1000;
+          }
+          updateBalanceDisplay();
+        })
+        .catch(err => {
+          console.error("Balance sync failed:", err);
+          balance = parseFloat(localStorage.getItem("slotsBalance")) || 1000;
+          updateBalanceDisplay();
+        });
     }
-    updateBalanceDisplay();
+
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance.toFixed(2);
+      localStorage.setItem("slotsBalance", balance);
+    }
 
     function launchGame(name) {
       const fileName = name.toLowerCase().replace(/ /g, '-') + '.html';
       window.open(fileName, '_blank');
       window.close();
     }
+
+    syncBalanceFromPublic();
   </script>
 </body>
 </html>

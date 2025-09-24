@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Avia Masters Infinite</title>
+  <style>
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 2px solid #444;
+      margin-top: 20px;
+      background: linear-gradient(to top, #003, #00aaff);
+    }
+    input, button {
+      font-size: 1em;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛩️ Avia Masters Infinite</h1>
+  <div>Balance: $<span id="balanceDisplay">0</span></div>
+  <input id="betInput" type="number" min="1" placeholder="Bet amount" />
+  <button onclick="play()">Launch</button>
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <div id="result"></div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let balance = parseFloat(localStorage.getItem('slotsBalance')) || 1000;
+    let bet = 0;
+    let ball = { y: 390, vy: -5 };
+    let multipliers = [];
+    let carriers = [];
+    let stackedMultiplier = 1;
+    let active = false;
+    let interval;
+    let cameraOffset = 0;
+    const balanceEl = document.getElementById('balanceDisplay');
+    const resultEl = document.getElementById('result');
+
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance.toFixed(2);
+      localStorage.setItem('slotsBalance', balance.toString());
+    }
+    updateBalanceDisplay();
+
+    function generateMultipliers() {
+      multipliers = [];
+      for (let i = 0; i < 150; i++) {
+        const x = 600 + i * 60 + Math.random() * 40;
+        const y = 50 + Math.random() * 250;
+        const value = Math.floor(Math.random() * 10) + 1;
+        multipliers.push({ x, y, value });
+      }
+    }
+
+    function generateCarriers() {
+      carriers = [];
+      for (let i = 0; i < 4; i++) {
+        carriers.push({ x: 1000 + i * 600, y: canvas.height - 20, width: 100, height: 10 });
+      }
+    }
+
+    function drawScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Water
+      ctx.fillStyle = '#004';
+      ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
+
+      // Carriers
+      ctx.fillStyle = '#666';
+      carriers.forEach(c => {
+        ctx.fillRect(c.x - cameraOffset, c.y, c.width, c.height);
+      });
+
+      // Multipliers
+      ctx.fillStyle = '#0f0';
+      ctx.font = '14px sans-serif';
+      multipliers.forEach(m => {
+        ctx.fillText(`${m.value}x`, m.x - cameraOffset - 10, m.y - 12);
+        ctx.beginPath();
+        ctx.arc(m.x - cameraOffset, m.y, 10, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // Ball (centered horizontally)
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, ball.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+    }
+
+    function play() {
+      bet = parseFloat(document.getElementById('betInput').value);
+      if (isNaN(bet) || bet <= 0) {
+        resultEl.textContent = "❌ Invalid bet.";
+        return;
+      }
+      if (bet > balance) {
+        resultEl.textContent = "❌ Insufficient balance.";
+        return;
+      }
+
+      balance -= bet;
+      updateBalanceDisplay();
+      stackedMultiplier = 1;
+      ball = { y: 390, vy: -5 };
+      cameraOffset = 0;
+      generateMultipliers();
+      generateCarriers();
+      active = true;
+      resultEl.textContent = "";
+
+      interval = setInterval(() => {
+        cameraOffset += 2;
+        ball.y += ball.vy;
+        ball.vy += 0.2;
+
+        // Multiplier collisions
+        multipliers.forEach((m, i) => {
+          const dx = canvas.width / 2 - (m.x - cameraOffset);
+          const dy = ball.y - m.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 12) {
+            stackedMultiplier *= m.value;
+            ball.vy = -8;
+            multipliers.splice(i, 1);
+          }
+        });
+
+        // Carrier bounce
+        carriers.forEach(c => {
+          const cx = c.x - cameraOffset;
+          if (
+            canvas.width / 2 > cx &&
+            canvas.width / 2 < cx + c.width &&
+            ball.y >= c.y - 8 &&
+            ball.y <= c.y + c.height
+          ) {
+            ball.vy = -6;
+          }
+        });
+
+        // Crash
+        if (ball.y >= canvas.height - 10) {
+          clearInterval(interval);
+          active = false;
+          resultEl.textContent = `💥 Splash! You lost $${bet.toFixed(2)}.`;
+          drawScene();
+          return;
+        }
+
+        drawScene();
+      }, 30);
+    }
+  </script>
+</body>
+</html>
