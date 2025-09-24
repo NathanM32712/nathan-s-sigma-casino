@@ -78,21 +78,24 @@
       localStorage.setItem('deviceID', deviceID);
     }
 
+    if (PERMANENT_ADMINS.includes(deviceID)) {
+      showPanel();
+      fetchAdminList();
+    } else {
+      checkApproval();
+    }
+
     async function checkApproval() {
       try {
         const res = await fetch('/admin/list');
         const list = await res.json();
-        if (PERMANENT_ADMINS.includes(deviceID) || list.includes(deviceID)) {
-          document.getElementById('auth').style.display = 'none';
-          document.getElementById('panel').style.display = 'block';
-          if (PERMANENT_ADMINS.includes(deviceID)) showRemovableAdmins(list);
+        if (list.includes(deviceID)) {
+          showPanel();
         }
       } catch (e) {
         console.error("Approval check failed", e);
       }
     }
-
-    checkApproval();
 
     function flipAlphabet(text) {
       return text.split('').map(c => {
@@ -113,17 +116,17 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deviceID })
         });
-        document.getElementById('auth').style.display = 'none';
-        document.getElementById('panel').style.display = 'block';
-        if (PERMANENT_ADMINS.includes(deviceID)) {
-          const res = await fetch('/admin/list');
-          const list = await res.json();
-          showRemovableAdmins(list);
-        }
+        showPanel();
         alert("✅ Access granted.");
       } else {
         alert("❌ Incorrect password.");
       }
+    }
+
+    function showPanel() {
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      if (PERMANENT_ADMINS.includes(deviceID)) fetchAdminList();
     }
 
     function setBalance() {
@@ -145,30 +148,34 @@
       window.location.href = 'index.html';
     }
 
-    function showRemovableAdmins(list) {
-      const removable = list.filter(id => !PERMANENT_ADMINS.includes(id));
-      const container = document.getElementById('adminList');
-      container.innerHTML = "";
-      if (removable.length === 0) {
-        container.innerHTML = "<p>No removable admins.</p>";
-      } else {
-        removable.forEach(id => {
-          const btn = document.createElement('button');
-          btn.className = 'removeBtn';
-          btn.textContent = `Remove ${id}`;
-          btn.onclick = () => removeAdmin(id);
-          container.appendChild(btn);
-        });
+    async function fetchAdminList() {
+      try {
+        const res = await fetch('/admin/list');
+        const list = await res.json();
+        const removable = list.filter(id => !PERMANENT_ADMINS.includes(id));
+        const container = document.getElementById('adminList');
+        container.innerHTML = "";
+        if (removable.length === 0) {
+          container.innerHTML = "<p>No removable admins.</p>";
+        } else {
+          removable.forEach(id => {
+            const btn = document.createElement('button');
+            btn.className = 'removeBtn';
+            btn.textContent = `Remove ${id}`;
+            btn.onclick = () => removeAdmin(id);
+            container.appendChild(btn);
+          });
+        }
+        document.getElementById('removeSection').style.display = 'block';
+      } catch (e) {
+        console.error("Failed to fetch admin list", e);
       }
-      document.getElementById('removeSection').style.display = 'block';
     }
 
     async function removeAdmin(id) {
       await fetch(`/admin/remove/${id}`, { method: 'DELETE' });
       alert(`❌ Removed ${id}`);
-      const res = await fetch('/admin/list');
-      const list = await res.json();
-      showRemovableAdmins(list);
+      fetchAdminList();
     }
   </script>
 </body>
