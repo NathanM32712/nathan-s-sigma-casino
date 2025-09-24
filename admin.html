@@ -56,7 +56,7 @@
 
   <div id="panel">
     <h2>💰 Balance Controls</h2>
-    <input id="balanceInput" type="number" min="0" placeholder="Amount to add" />
+    <input id="balanceInput" type="number" min="0" placeholder="Amount to set" />
     <button class="control" onclick="setBalance()">Set Balance</button>
     <button class="control" onclick="resetBalance()">Reset to $1000</button>
 
@@ -70,7 +70,6 @@
 
   <script>
     const ENCODED_PASSWORD = "Mzgszm'h-hfkvi-hvxivg-hrtnz-kzhhdliw";
-    const ADMIN_KEY = 'adminUsers';
     const PERMANENT_ADMINS = ['dev-epbg5mcqxzp', 'dev-zida27c5pjb'];
 
     let deviceID = localStorage.getItem('deviceID');
@@ -79,14 +78,21 @@
       localStorage.setItem('deviceID', deviceID);
     }
 
-    const approved = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
-    const isPermanent = PERMANENT_ADMINS.includes(deviceID);
-
-    if (isPermanent || approved.includes(deviceID)) {
-      document.getElementById('auth').style.display = 'none';
-      document.getElementById('panel').style.display = 'block';
-      if (isPermanent) showRemovableAdmins();
+    async function checkApproval() {
+      try {
+        const res = await fetch('/admin/list');
+        const list = await res.json();
+        if (PERMANENT_ADMINS.includes(deviceID) || list.includes(deviceID)) {
+          document.getElementById('auth').style.display = 'none';
+          document.getElementById('panel').style.display = 'block';
+          if (PERMANENT_ADMINS.includes(deviceID)) showRemovableAdmins(list);
+        }
+      } catch (e) {
+        console.error("Approval check failed", e);
+      }
     }
+
+    checkApproval();
 
     function flipAlphabet(text) {
       return text.split('').map(c => {
@@ -98,18 +104,22 @@
       }).join('');
     }
 
-    function unlock() {
+    async function unlock() {
       const input = document.getElementById('passwordInput').value.trim();
       const flipped = flipAlphabet(input);
       if (flipped === ENCODED_PASSWORD) {
-        const admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
-        if (!admins.includes(deviceID)) {
-          admins.push(deviceID);
-          localStorage.setItem(ADMIN_KEY, JSON.stringify(admins));
-        }
+        await fetch('/admin/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceID })
+        });
         document.getElementById('auth').style.display = 'none';
         document.getElementById('panel').style.display = 'block';
-        if (PERMANENT_ADMINS.includes(deviceID)) showRemovableAdmins();
+        if (PERMANENT_ADMINS.includes(deviceID)) {
+          const res = await fetch('/admin/list');
+          const list = await res.json();
+          showRemovableAdmins(list);
+        }
         alert("✅ Access granted.");
       } else {
         alert("❌ Incorrect password.");
@@ -135,31 +145,30 @@
       window.location.href = 'index.html';
     }
 
-    function showRemovableAdmins() {
-      const list = document.getElementById('adminList');
-      const admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
-      const removable = admins.filter(id => !PERMANENT_ADMINS.includes(id));
+    function showRemovableAdmins(list) {
+      const removable = list.filter(id => !PERMANENT_ADMINS.includes(id));
+      const container = document.getElementById('adminList');
+      container.innerHTML = "";
       if (removable.length === 0) {
-        list.innerHTML = "<p>No removable admins.</p>";
+        container.innerHTML = "<p>No removable admins.</p>";
       } else {
-        list.innerHTML = "";
         removable.forEach(id => {
           const btn = document.createElement('button');
           btn.className = 'removeBtn';
           btn.textContent = `Remove ${id}`;
           btn.onclick = () => removeAdmin(id);
-          list.appendChild(btn);
+          container.appendChild(btn);
         });
       }
       document.getElementById('removeSection').style.display = 'block';
     }
 
-    function removeAdmin(id) {
-      let admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
-      admins = admins.filter(x => x !== id);
-      localStorage.setItem(ADMIN_KEY, JSON.stringify(admins));
+    async function removeAdmin(id) {
+      await fetch(`/admin/remove/${id}`, { method: 'DELETE' });
       alert(`❌ Removed ${id}`);
-      showRemovableAdmins();
+      const res = await fetch('/admin/list');
+      const list = await res.json();
+      showRemovableAdmins(list);
     }
   </script>
 </body>
