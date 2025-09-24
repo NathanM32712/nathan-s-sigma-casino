@@ -62,7 +62,13 @@
 
   <div id="panel">
     <div class="section">
-      <h2>💰 Set Balance</h2>
+      <h2>💰 Set Your Own Balance</h2>
+      <input id="selfAmount" type="number" min="0" placeholder="Amount" />
+      <button class="control" onclick="setSelfBalance()">Set</button>
+    </div>
+
+    <div class="section">
+      <h2>🧍 Set Another User's Balance</h2>
       <input id="targetID" placeholder="User ID" />
       <input id="targetAmount" type="number" min="0" placeholder="New Balance" />
       <button class="control" onclick="setBalance()">Set</button>
@@ -143,6 +149,16 @@
       document.getElementById('auth').style.display = 'none';
       document.getElementById('panel').style.display = 'block';
       if (PERMANENT_ADMINS.includes(deviceID)) fetchAdminList();
+    }
+
+    function setSelfBalance() {
+      const amount = parseFloat(document.getElementById('selfAmount').value);
+      if (isNaN(amount) || amount < 0) {
+        alert("❌ Invalid amount.");
+        return;
+      }
+      localStorage.setItem('slotsBalance', amount.toString());
+      alert(`✅ Your balance set to $${amount.toFixed(2)}.`);
     }
 
     function setBalance() {
