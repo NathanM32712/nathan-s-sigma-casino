@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Limbo</title>
+  <style>
+    body {
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    input, button {
+      font-size: 1em;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+    #backBtn {
+      background: #f59e0b;
+      color: #000;
+      font-weight: bold;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Limbo</h1>
+  <div>Balance: $<span id="balanceDisplay">0</span></div>
+
+  <input id="betInput" type="number" min="1" placeholder="Bet amount" />
+  <input id="multiplierInput" type="number" min="1.01" step="0.01" placeholder="Target multiplier" />
+  <button onclick="play()">Play</button>
+
+  <div id="result"></div>
+  <button id="backBtn" onclick="goBack()">Back to Casino</button>
+
+  <script>
+    let balance = parseFloat(localStorage.getItem('slotsBalance')) || 1000;
+    const balanceEl = document.getElementById('balanceDisplay');
+    const resultEl = document.getElementById('result');
+
+    function updateBalanceDisplay() {
+      balanceEl.textContent = balance.toFixed(2);
+      localStorage.setItem('slotsBalance', balance.toString());
+    }
+    updateBalanceDisplay();
+
+    function play() {
+      const bet = parseFloat(document.getElementById('betInput').value);
+      const target = parseFloat(document.getElementById('multiplierInput').value);
+      if (isNaN(bet) || isNaN(target) || bet <= 0 || target <= 1) {
+        resultEl.textContent = "❌ Invalid bet or multiplier.";
+        return;
+      }
+      if (bet > balance) {
+        resultEl.textContent = "❌ Insufficient balance.";
+        return;
+      }
+
+      const raw = Math.random(); // 0–1
+      const crash = parseFloat((1 + Math.pow(raw, 3) * 99).toFixed(2)); // favors low values
+
+      if (crash >= target) {
+        const win = bet * target;
+        balance += win;
+        resultEl.textContent = `✅ Crash: ${crash} — You won $${win.toFixed(2)}!`;
+      } else {
+        balance -= bet;
+        resultEl.textContent = `💥 Crash: ${crash} — You lost $${bet.toFixed(2)}.`;
+      }
+      updateBalanceDisplay();
+    }
+
+    function goBack() {
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
