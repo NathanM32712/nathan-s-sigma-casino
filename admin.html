@@ -34,17 +34,6 @@
       font-weight: bold;
       margin-top: 30px;
     }
-    #removeSection {
-      margin-top: 40px;
-      border-top: 2px solid #444;
-      padding-top: 20px;
-    }
-    .removeBtn {
-      background: #f00;
-      color: #fff;
-      font-weight: bold;
-      margin: 5px;
-    }
   </style>
 </head>
 <body>
@@ -56,21 +45,17 @@
 
   <div id="panel">
     <h2>💰 Balance Controls</h2>
-    <input id="balanceInput" type="number" min="0" placeholder="Amount to set" />
+    <input id="balanceInput" type="number" min="0" placeholder="Amount to add" />
     <button class="control" onclick="setBalance()">Set Balance</button>
     <button class="control" onclick="resetBalance()">Reset to $1000</button>
 
-    <div id="removeSection" style="display:none;">
-      <h2>🧨 Remove Admins</h2>
-      <div id="adminList"></div>
-    </div>
-
+    <h2>🔙 Navigation</h2>
     <button id="backBtn" onclick="goBack()">Back to Casino</button>
   </div>
 
   <script>
     const ENCODED_PASSWORD = "Mzgszm'h-hfkvi-hvxivg-hrtnz-kzhhdliw";
-    const PERMANENT_ADMINS = ['dev-epbg5mcqxzp', 'dev-zida27c5pjb'];
+    const ADMIN_KEY = 'adminUsers';
 
     let deviceID = localStorage.getItem('deviceID');
     if (!deviceID) {
@@ -78,23 +63,10 @@
       localStorage.setItem('deviceID', deviceID);
     }
 
-    if (PERMANENT_ADMINS.includes(deviceID)) {
-      showPanel();
-      fetchAdminList();
-    } else {
-      checkApproval();
-    }
-
-    async function checkApproval() {
-      try {
-        const res = await fetch('/admin/list');
-        const list = await res.json();
-        if (list.includes(deviceID)) {
-          showPanel();
-        }
-      } catch (e) {
-        console.error("Approval check failed", e);
-      }
+    const approved = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+    if (approved.includes(deviceID)) {
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
     }
 
     function flipAlphabet(text) {
@@ -107,26 +79,21 @@
       }).join('');
     }
 
-    async function unlock() {
+    function unlock() {
       const input = document.getElementById('passwordInput').value.trim();
       const flipped = flipAlphabet(input);
       if (flipped === ENCODED_PASSWORD) {
-        await fetch('/admin/approve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceID })
-        });
-        showPanel();
+        const admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+        if (!admins.includes(deviceID)) {
+          admins.push(deviceID);
+          localStorage.setItem(ADMIN_KEY, JSON.stringify(admins));
+        }
+        document.getElementById('auth').style.display = 'none';
+        document.getElementById('panel').style.display = 'block';
         alert("✅ Access granted.");
       } else {
         alert("❌ Incorrect password.");
       }
-    }
-
-    function showPanel() {
-      document.getElementById('auth').style.display = 'none';
-      document.getElementById('panel').style.display = 'block';
-      if (PERMANENT_ADMINS.includes(deviceID)) fetchAdminList();
     }
 
     function setBalance() {
@@ -135,8 +102,10 @@
         alert("Enter a valid amount.");
         return;
       }
-      localStorage.setItem('slotsBalance', amount.toString());
-      alert(`🏆 Balance set to $${amount}`);
+      const current = parseFloat(localStorage.getItem('slotsBalance') || '0');
+      const newBalance = current + amount;
+      localStorage.setItem('slotsBalance', newBalance.toString());
+      alert(`🏆 Balance updated to $${newBalance}`);
     }
 
     function resetBalance() {
@@ -146,36 +115,6 @@
 
     function goBack() {
       window.location.href = 'index.html';
-    }
-
-    async function fetchAdminList() {
-      try {
-        const res = await fetch('/admin/list');
-        const list = await res.json();
-        const removable = list.filter(id => !PERMANENT_ADMINS.includes(id));
-        const container = document.getElementById('adminList');
-        container.innerHTML = "";
-        if (removable.length === 0) {
-          container.innerHTML = "<p>No removable admins.</p>";
-        } else {
-          removable.forEach(id => {
-            const btn = document.createElement('button');
-            btn.className = 'removeBtn';
-            btn.textContent = `Remove ${id}`;
-            btn.onclick = () => removeAdmin(id);
-            container.appendChild(btn);
-          });
-        }
-        document.getElementById('removeSection').style.display = 'block';
-      } catch (e) {
-        console.error("Failed to fetch admin list", e);
-      }
-    }
-
-    async function removeAdmin(id) {
-      await fetch(`/admin/remove/${id}`, { method: 'DELETE' });
-      alert(`❌ Removed ${id}`);
-      fetchAdminList();
     }
   </script>
 </body>
