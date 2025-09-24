@@ -1,139 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Admin Panel</title>
   <style>
-    body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
-    input, button { font-size: 1em; margin: 10px; padding: 5px 15px; }
-    #adminPanel { display: none; margin-top: 20px; }
-    .adminBox { margin: 5px; padding: 5px; background: #222; border: 1px solid #555; }
+    body {
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    input, button {
+      font-size: 1em;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+    #panel {
+      display: none;
+      margin-top: 30px;
+    }
+    .control {
+      background: #0f0;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #backBtn {
+      background: #f59e0b;
+      color: #000;
+      font-weight: bold;
+      margin-top: 30px;
+    }
+    #removeSection {
+      margin-top: 40px;
+      border-top: 2px solid #444;
+      padding-top: 20px;
+    }
+    .removeBtn {
+      background: #f00;
+      color: #fff;
+      font-weight: bold;
+      margin: 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>🔐 Admin Access</h1>
-  <div id="loginPanel">
-    <input id="userID" placeholder="Enter your ID" />
+  <h1>🛠️ Admin Panel</h1>
+  <div id="auth">
     <input id="passwordInput" placeholder="Enter password" />
-    <button onclick="login()">Login</button>
+    <button onclick="unlock()">Unlock</button>
   </div>
 
-  <div id="adminPanel">
-    <h2>✅ Approved Admins</h2>
-    <div id="adminList"></div>
-
+  <div id="panel">
     <h2>💰 Balance Controls</h2>
-    <input id="balanceInput" type="number" min="0" placeholder="Enter new balance" />
-    <button onclick="setBalance()">Set Balance</button>
-    <button onclick="resetBalance()">Reset to $1000</button>
+    <input id="balanceInput" type="number" min="0" placeholder="Amount to add" />
+    <button class="control" onclick="setBalance()">Set Balance</button>
+    <button class="control" onclick="resetBalance()">Reset to $1000</button>
 
-    <h2>🔙 Navigation</h2>
-    <button onclick="goBack()">Back to Homepage</button>
+    <div id="removeSection" style="display:none;">
+      <h2>🧨 Remove Admins</h2>
+      <div id="adminList"></div>
+    </div>
+
+    <button id="backBtn" onclick="goBack()">Back to Casino</button>
   </div>
 
   <script>
     const ENCODED_PASSWORD = "Mzgszm'h-hfkvi-hvxivg-hrtnz-kzhhdliw";
+    const ADMIN_KEY = 'adminUsers';
     const PERMANENT_ADMINS = ['dev-epbg5mcqxzp', 'dev-zida27c5pjb'];
 
+    let deviceID = localStorage.getItem('deviceID');
+    if (!deviceID) {
+      deviceID = 'dev-' + Math.random().toString(36).substr(2);
+      localStorage.setItem('deviceID', deviceID);
+    }
+
+    const approved = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+    const isPermanent = PERMANENT_ADMINS.includes(deviceID);
+
+    if (isPermanent || approved.includes(deviceID)) {
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      if (isPermanent) showRemovableAdmins();
+    }
+
     function flipAlphabet(text) {
-      const flip = c => {
+      return text.split('').map(c => {
         const isUpper = c >= 'A' && c <= 'Z';
         const isLower = c >= 'a' && c <= 'z';
         if (isUpper) return String.fromCharCode(155 - c.charCodeAt(0));
         if (isLower) return String.fromCharCode(219 - c.charCodeAt(0));
         return c;
-      };
-      return text.split('').map(flip).join('');
+      }).join('');
     }
 
-    function getAdmins() {
-      return JSON.parse(localStorage.getItem('approvedAdmins') || '[]');
-    }
-
-    function saveAdmins(list) {
-      localStorage.setItem('approvedAdmins', JSON.stringify(list));
-    }
-
-    function login() {
-      const userID = document.getElementById('userID').value.trim();
-      const password = document.getElementById('passwordInput').value.trim();
-      if (!userID || !password) return alert("Enter both ID and password");
-
-      if (PERMANENT_ADMINS.includes(userID)) {
-        grantAccess(userID);
-        return;
-      }
-
-      const flipped = flipAlphabet(password);
+    function unlock() {
+      const input = document.getElementById('passwordInput').value.trim();
+      const flipped = flipAlphabet(input);
       if (flipped === ENCODED_PASSWORD) {
-        grantAccess(userID);
+        const admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+        if (!admins.includes(deviceID)) {
+          admins.push(deviceID);
+          localStorage.setItem(ADMIN_KEY, JSON.stringify(admins));
+        }
+        document.getElementById('auth').style.display = 'none';
+        document.getElementById('panel').style.display = 'block';
+        if (PERMANENT_ADMINS.includes(deviceID)) showRemovableAdmins();
+        alert("✅ Access granted.");
       } else {
-        alert("Incorrect password.");
+        alert("❌ Incorrect password.");
       }
-    }
-
-    function grantAccess(userID) {
-      const admins = getAdmins();
-      if (!admins.includes(userID)) {
-        admins.push(userID);
-        saveAdmins(admins);
-      }
-      showAdminPanel();
-    }
-
-    function removeAdmin(userID) {
-      const admins = getAdmins().filter(id => id !== userID);
-      saveAdmins(admins);
-      renderAdminList();
-    }
-
-    function renderAdminList() {
-      const list = document.getElementById('adminList');
-      list.innerHTML = '';
-      getAdmins().forEach(id => {
-        const box = document.createElement('div');
-        box.className = 'adminBox';
-        box.innerHTML = `${id} <button onclick="removeAdmin('${id}')">Remove</button>`;
-        list.appendChild(box);
-      });
-    }
-
-    function showAdminPanel() {
-      document.getElementById('loginPanel').style.display = 'none';
-      document.getElementById('adminPanel').style.display = 'block';
-      renderAdminList();
-    }
-
-    function resetBalance() {
-      localStorage.setItem('casino_balance', '1000');
-      alert("Balance reset to $1000");
     }
 
     function setBalance() {
-      const val = document.getElementById('balanceInput').value.trim();
-      const num = parseFloat(val);
-      if (isNaN(num) || num < 0) {
-        alert("Please enter a valid positive number.");
+      const amount = parseFloat(document.getElementById('balanceInput').value.trim());
+      if (isNaN(amount) || amount <= 0) {
+        alert("Enter a valid amount.");
         return;
       }
-      localStorage.setItem('casino_balance', num.toString());
-      alert(`Balance set to $${num}`);
+      localStorage.setItem('slotsBalance', amount.toString());
+      alert(`🏆 Balance set to $${amount}`);
+    }
+
+    function resetBalance() {
+      localStorage.setItem('slotsBalance', '1000');
+      alert("Balance reset to $1000");
     }
 
     function goBack() {
       window.location.href = 'index.html';
     }
 
-    // Auto-login if permanent admin
-    const autoID = localStorage.getItem('user_id');
-    if (PERMANENT_ADMINS.includes(autoID)) {
-      grantAccess(autoID);
+    function showRemovableAdmins() {
+      const list = document.getElementById('adminList');
+      const admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+      const removable = admins.filter(id => !PERMANENT_ADMINS.includes(id));
+      if (removable.length === 0) {
+        list.innerHTML = "<p>No removable admins.</p>";
+      } else {
+        list.innerHTML = "";
+        removable.forEach(id => {
+          const btn = document.createElement('button');
+          btn.className = 'removeBtn';
+          btn.textContent = `Remove ${id}`;
+          btn.onclick = () => removeAdmin(id);
+          list.appendChild(btn);
+        });
+      }
+      document.getElementById('removeSection').style.display = 'block';
     }
 
-    // Save user ID for session
-    document.getElementById('userID').addEventListener('change', e => {
-      localStorage.setItem('user_id', e.target.value.trim());
-    });
+    function removeAdmin(id) {
+      let admins = JSON.parse(localStorage.getItem(ADMIN_KEY) || '[]');
+      admins = admins.filter(x => x !== id);
+      localStorage.setItem(ADMIN_KEY, JSON.stringify(admins));
+      alert(`❌ Removed ${id}`);
+      showRemovableAdmins();
+    }
   </script>
 </body>
 </html>
