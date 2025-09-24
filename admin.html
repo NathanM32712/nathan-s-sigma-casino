@@ -17,8 +17,6 @@
       margin: 10px;
       border-radius: 6px;
       border: none;
-    }
-    button {
       font-weight: bold;
       cursor: pointer;
     }
@@ -33,13 +31,7 @@
       border-radius: 10px;
       background: #1e1e1e;
       max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    #backBtn {
-      background: #f59e0b;
-      color: #000;
-      margin-top: 30px;
+      margin: auto;
     }
     .control {
       background: #0f0;
@@ -49,6 +41,11 @@
       background: #f00;
       color: #fff;
       margin: 5px;
+    }
+    #backBtn {
+      background: #f59e0b;
+      color: #000;
+      margin-top: 30px;
     }
   </style>
 </head>
@@ -68,6 +65,12 @@
     </div>
 
     <div class="section">
+      <h2>📥 Send Self Money</h2>
+      <input id="selfSendAmount" type="number" min="0" placeholder="Amount to add" />
+      <button class="control" onclick="sendSelfMoney()">Send</button>
+    </div>
+
+    <div class="section">
       <h2>🧍 Set Another User's Balance</h2>
       <input id="targetID" placeholder="User ID" />
       <input id="targetAmount" type="number" min="0" placeholder="New Balance" />
@@ -75,7 +78,7 @@
     </div>
 
     <div class="section">
-      <h2>📤 Send Money</h2>
+      <h2>📤 Send Money Between Users</h2>
       <input id="senderID" placeholder="Sender ID" />
       <input id="receiverID" placeholder="Receiver ID" />
       <input id="transferAmount" type="number" min="0" placeholder="Amount to Send" />
@@ -161,6 +164,18 @@
       alert(`✅ Your balance set to $${amount.toFixed(2)}.`);
     }
 
+    function sendSelfMoney() {
+      const amount = parseFloat(document.getElementById('selfSendAmount').value);
+      if (isNaN(amount) || amount <= 0) {
+        alert("❌ Invalid amount.");
+        return;
+      }
+      const current = parseFloat(localStorage.getItem('slotsBalance')) || 0;
+      const updated = current + amount;
+      localStorage.setItem('slotsBalance', updated.toString());
+      alert(`✅ Added $${amount.toFixed(2)} to your balance. New total: $${updated.toFixed(2)}.`);
+    }
+
     function setBalance() {
       const id = document.getElementById('targetID').value.trim();
       const amount = parseFloat(document.getElementById('targetAmount').value);
@@ -212,17 +227,4 @@
             container.appendChild(btn);
           });
         }
-        document.getElementById('removeSection').style.display = 'block';
-      } catch (e) {
-        console.error("Failed to fetch admin list", e);
-      }
-    }
-
-    async function removeAdmin(id) {
-      await fetch(`/admin/remove/${id}`, { method: 'DELETE' });
-      alert(`❌ Removed ${id}`);
-      fetchAdminList();
-    }
-  </script>
-</body>
-</html>
+        document.getElementBy
