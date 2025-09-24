@@ -17,80 +17,55 @@
       margin: 10px;
       border-radius: 6px;
       border: none;
-      font-weight: bold;
-      cursor: pointer;
     }
     #panel {
       display: none;
       margin-top: 30px;
     }
-    .section {
-      margin-bottom: 30px;
-      border: 2px solid #0f0;
-      padding: 20px;
-      border-radius: 10px;
-      background: #1e1e1e;
-      max-width: 400px;
-      margin: auto;
-    }
     .control {
       background: #0f0;
       color: #000;
-    }
-    .removeBtn {
-      background: #f00;
-      color: #fff;
-      margin: 5px;
+      font-weight: bold;
+      cursor: pointer;
     }
     #backBtn {
       background: #f59e0b;
       color: #000;
+      font-weight: bold;
       margin-top: 30px;
+    }
+    #removeSection {
+      margin-top: 40px;
+      border-top: 2px solid #444;
+      padding-top: 20px;
+    }
+    .removeBtn {
+      background: #f00;
+      color: #fff;
+      font-weight: bold;
+      margin: 5px;
     }
   </style>
 </head>
 <body>
   <h1>🛠️ Admin Panel</h1>
-
   <div id="auth">
     <input id="passwordInput" placeholder="Enter password" />
     <button onclick="unlock()">Unlock</button>
   </div>
 
   <div id="panel">
-    <div class="section">
-      <h2>💰 Set Your Own Balance</h2>
-      <input id="selfAmount" type="number" min="0" placeholder="Amount" />
-      <button class="control" onclick="setSelfBalance()">Set</button>
-    </div>
+    <h2>💰 Balance Controls</h2>
+    <input id="balanceInput" type="number" min="0" placeholder="Amount to set" />
+    <button class="control" onclick="setBalance()">Set Balance</button>
+    <button class="control" onclick="resetBalance()">Reset to $1000</button>
 
-    <div class="section">
-      <h2>📥 Send Self Money</h2>
-      <input id="selfSendAmount" type="number" min="0" placeholder="Amount to add" />
-      <button class="control" onclick="sendSelfMoney()">Send</button>
-    </div>
-
-    <div class="section">
-      <h2>🧍 Set Another User's Balance</h2>
-      <input id="targetID" placeholder="User ID" />
-      <input id="targetAmount" type="number" min="0" placeholder="New Balance" />
-      <button class="control" onclick="setBalance()">Set</button>
-    </div>
-
-    <div class="section">
-      <h2>📤 Send Money Between Users</h2>
-      <input id="senderID" placeholder="Sender ID" />
-      <input id="receiverID" placeholder="Receiver ID" />
-      <input id="transferAmount" type="number" min="0" placeholder="Amount to Send" />
-      <button class="control" onclick="sendMoney()">Send</button>
-    </div>
-
-    <div class="section" id="removeSection" style="display:none;">
+    <div id="removeSection" style="display:none;">
       <h2>🧨 Remove Admins</h2>
       <div id="adminList"></div>
     </div>
 
-    <button id="backBtn" onclick="window.location.href='index.html'">Back to Casino</button>
+    <button id="backBtn" onclick="goBack()">Back to Casino</button>
   </div>
 
   <script>
@@ -154,59 +129,23 @@
       if (PERMANENT_ADMINS.includes(deviceID)) fetchAdminList();
     }
 
-    function setSelfBalance() {
-      const amount = parseFloat(document.getElementById('selfAmount').value);
-      if (isNaN(amount) || amount < 0) {
-        alert("❌ Invalid amount.");
+    function setBalance() {
+      const amount = parseFloat(document.getElementById('balanceInput').value.trim());
+      if (isNaN(amount) || amount <= 0) {
+        alert("Enter a valid amount.");
         return;
       }
       localStorage.setItem('slotsBalance', amount.toString());
-      alert(`✅ Your balance set to $${amount.toFixed(2)}.`);
+      alert(`🏆 Balance set to $${amount}`);
     }
 
-    function sendSelfMoney() {
-      const amount = parseFloat(document.getElementById('selfSendAmount').value);
-      if (isNaN(amount) || amount <= 0) {
-        alert("❌ Invalid amount.");
-        return;
-      }
-      const current = parseFloat(localStorage.getItem('slotsBalance')) || 0;
-      const updated = current + amount;
-      localStorage.setItem('slotsBalance', updated.toString());
-      alert(`✅ Added $${amount.toFixed(2)} to your balance. New total: $${updated.toFixed(2)}.`);
+    function resetBalance() {
+      localStorage.setItem('slotsBalance', '1000');
+      alert("Balance reset to $1000");
     }
 
-    function setBalance() {
-      const id = document.getElementById('targetID').value.trim();
-      const amount = parseFloat(document.getElementById('targetAmount').value);
-      if (!id || isNaN(amount) || amount < 0) {
-        alert("❌ Invalid input.");
-        return;
-      }
-      const balances = JSON.parse(localStorage.getItem('publicBalances') || '{}');
-      balances[id] = amount;
-      localStorage.setItem('publicBalances', JSON.stringify(balances));
-      alert(`✅ Set ${id}'s balance to $${amount.toFixed(2)}.`);
-    }
-
-    function sendMoney() {
-      const sender = document.getElementById('senderID').value.trim();
-      const receiver = document.getElementById('receiverID').value.trim();
-      const amount = parseFloat(document.getElementById('transferAmount').value);
-      if (!sender || !receiver || isNaN(amount) || amount <= 0) {
-        alert("❌ Invalid input.");
-        return;
-      }
-      const balances = JSON.parse(localStorage.getItem('publicBalances') || '{}');
-      const senderBalance = balances[sender] || 0;
-      if (senderBalance < amount) {
-        alert("❌ Sender has insufficient funds.");
-        return;
-      }
-      balances[sender] = senderBalance - amount;
-      balances[receiver] = (balances[receiver] || 0) + amount;
-      localStorage.setItem('publicBalances', JSON.stringify(balances));
-      alert(`✅ Sent $${amount.toFixed(2)} from ${sender} to ${receiver}.`);
+    function goBack() {
+      window.location.href = 'index.html';
     }
 
     async function fetchAdminList() {
@@ -229,4 +168,15 @@
         }
         document.getElementById('removeSection').style.display = 'block';
       } catch (e) {
-        console
+        console.error("Failed to fetch admin list", e);
+      }
+    }
+
+    async function removeAdmin(id) {
+      await fetch(`/admin/remove/${id}`, { method: 'DELETE' });
+      alert(`❌ Removed ${id}`);
+      fetchAdminList();
+    }
+  </script>
+</body>
+</html>
